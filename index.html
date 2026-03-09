@@ -3,64 +3,115 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Mappiter debug mapa</title>
+<title>Mappiter debug layout + càrrega</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
 <style>
-html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff}
-#topBand{
-  position:fixed;top:0;left:0;right:0;height:60px;background:#fff;
-  display:flex;align-items:center;justify-content:center;z-index:10;
-  box-shadow:0 2px 6px rgba(0,0,0,.1)
+html,body{
+  margin:0;
+  height:100%;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background:#fff;
 }
-#topBand img{height:55px;max-width:90vw;object-fit:contain}
-#map{position:absolute;top:60px;left:0;right:0;bottom:0}
-#loading{
-  position:fixed;left:12px;top:72px;z-index:30;
-  background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.12);
-  border-radius:12px;padding:8px 10px;font-weight:700
+#topBand{
+  position:fixed;
+  top:0; left:0; right:0;
+  height:60px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+#topBand img{
+  height:55px;
+  max-width:90vw;
+  object-fit:contain;
+}
+#map{
+  position:absolute;
+  top:60px;
+  bottom:0;
+  left:0;
+  right:0;
 }
 #debug{
-  position:fixed;left:12px;right:12px;bottom:12px;z-index:30;
-  background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.12);
-  border-radius:14px;padding:10px 12px;font:12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-  box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:36vh;overflow:auto;white-space:pre-wrap
+  position:fixed;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  max-height:42vh;
+  overflow:auto;
+  z-index:30;
+  background:rgba(255,255,255,.97);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:14px;
+  padding:10px 12px;
+  font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
+  white-space:pre-wrap;
+  box-shadow:0 8px 20px rgba(0,0,0,.14);
 }
-button{
-  position:fixed;right:16px;bottom:16px;z-index:30;
-  width:46px;height:46px;border-radius:999px;border:none;background:white;
-  box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:20px
+#loading{
+  position:fixed;
+  left:12px;
+  top:72px;
+  z-index:30;
+  background:rgba(255,255,255,.96);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  padding:8px 10px;
+  font-weight:700;
 }
 </style>
 </head>
 <body>
 <div id="topBand"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
 <div id="map"></div>
-<div id="loading">Carregant mapa…</div>
+<div id="loading">Diagnòstic en curs…</div>
 <div id="debug"></div>
-<button id="centerBtn">⌖</button>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 (async function(){
   const debugEl = document.getElementById('debug');
   const loadingEl = document.getElementById('loading');
-  const counts = { createMap:0, addSource:0, addLayer:0, fitBounds:0, resizeEvent:0, mapResize:0 };
-  const lines = [];
+  const t0 = performance.now();
+  let sourceLoadedAt = null;
+  let idleAt = null;
+  let municipisFetchMs = null;
+  let outlineFetchMs = null;
 
   function log(msg){
-    const stamp = new Date().toLocaleTimeString('ca-ES', {hour12:false});
-    lines.push("[" + stamp + "] " + msg);
-    debugEl.textContent = lines.join("\n") + "\n\nCOUNTS:\n" + JSON.stringify(counts, null, 2);
+    debugEl.textContent += msg + "\n";
     console.log(msg);
   }
 
-  log("Inici script");
-  log("Comprovació estat guardat: NO hi ha cap ús de localStorage, sessionStorage o similars en aquesta versió.");
+  function fmtMs(ms){
+    return (Math.round(ms * 10) / 10) + " ms";
+  }
+
+  async function timedJson(url){
+    const a = performance.now();
+    const res = await fetch(url, {cache:"default"});
+    const b = performance.now();
+    const text = await res.text();
+    const c = performance.now();
+    const json = JSON.parse(text);
+    const d = performance.now();
+    return {
+      json,
+      fetchMs: b - a,
+      textMs: c - b,
+      parseMs: d - c,
+      totalMs: d - a,
+      bytes: text.length
+    };
+  }
 
   function bounds(fc){
     let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
     function scan(c){
-      if(typeof c[0]==="number"){
+      if(typeof c[0] === "number"){
         minX=Math.min(minX,c[0]); minY=Math.min(minY,c[1]);
         maxX=Math.max(maxX,c[0]); maxY=Math.max(maxY,c[1]);
       }else c.forEach(scan);
@@ -69,17 +120,49 @@ button{
     return [[minX,minY],[maxX,maxY]];
   }
 
-  log("Fetch municipis_icgc.json");
-  const municipis = await fetch("municipis_icgc.json",{cache:"default"}).then(r=>r.json());
-  log("Fetch catalunya_outline.json");
-  const outline = await fetch("catalunya_outline.json",{cache:"default"}).then(r=>r.json());
+  log("=== DIAGNÒSTIC MAPPITER ===");
+  log("window.innerWidth = " + window.innerWidth);
+  log("window.innerHeight = " + window.innerHeight);
+
+  const mapEl = document.getElementById('map');
+  const mapRect0 = mapEl.getBoundingClientRect();
+  log("contenidor #map inicial = " + Math.round(mapRect0.width) + " x " + Math.round(mapRect0.height));
+
+  const municipisInfo = await timedJson("municipis_icgc.json");
+  municipisFetchMs = municipisInfo.totalMs;
+
+  const outlineInfo = await timedJson("catalunya_outline.json");
+  outlineFetchMs = outlineInfo.totalMs;
+
+  log("");
+  log("municipis_icgc.json");
+  log("- bytes = " + municipisInfo.bytes);
+  log("- MB decimals = " + (municipisInfo.bytes / 1000000).toFixed(2));
+  log("- MiB binaris = " + (municipisInfo.bytes / 1024 / 1024).toFixed(2));
+  log("- fetch headers = " + fmtMs(municipisInfo.fetchMs));
+  log("- lectura text = " + fmtMs(municipisInfo.textMs));
+  log("- parse JSON = " + fmtMs(municipisInfo.parseMs));
+  log("- total fetch+parse = " + fmtMs(municipisInfo.totalMs));
+
+  log("");
+  log("catalunya_outline.json");
+  log("- bytes = " + outlineInfo.bytes);
+  log("- MB decimals = " + (outlineInfo.bytes / 1000000).toFixed(2));
+  log("- MiB binaris = " + (outlineInfo.bytes / 1024 / 1024).toFixed(2));
+  log("- fetch headers = " + fmtMs(outlineInfo.fetchMs));
+  log("- lectura text = " + fmtMs(outlineInfo.textMs));
+  log("- parse JSON = " + fmtMs(outlineInfo.parseMs));
+  log("- total fetch+parse = " + fmtMs(outlineInfo.totalMs));
+
+  const municipis = municipisInfo.json;
+  const outline = outlineInfo.json;
+  municipis.features = municipis.features.map(f => { f.id = f.properties.CODIMUNI; return f; });
+
   const catBounds = bounds(outline);
 
-  counts.createMap += 1;
-  log("createMap #" + counts.createMap);
   const map = new maplibregl.Map({
     container:"map",
-    style:{version:8,sources:{},layers:[]},
+    style:{version:8, sources:{}, layers:[]},
     attributionControl:false,
     renderWorldCopies:false,
     dragRotate:false,
@@ -88,22 +171,12 @@ button{
     doubleClickZoom:false
   });
 
-  municipis.features = municipis.features.map(f => {
-    f.id = f.properties.CODIMUNI;
-    return f;
-  });
-
   map.on("load", () => {
-    counts.addSource += 1;
-    log("addSource municipis #" + counts.addSource);
-    map.addSource("municipis",{ type:"geojson", data:municipis, promoteId:"CODIMUNI" });
+    log("");
+    log("EVENT load");
+    map.addSource("municipis", { type:"geojson", data:municipis, promoteId:"CODIMUNI" });
+    map.addSource("outline", { type:"geojson", data:outline });
 
-    counts.addSource += 1;
-    log("addSource outline #" + counts.addSource);
-    map.addSource("outline",{ type:"geojson", data:outline });
-
-    counts.addLayer += 1;
-    log("addLayer municipis-fill #" + counts.addLayer);
     map.addLayer({
       id:"municipis-fill",
       type:"fill",
@@ -111,8 +184,6 @@ button{
       paint:{ "fill-color":"#f4f4f2" }
     });
 
-    counts.addLayer += 1;
-    log("addLayer municipis-line #" + counts.addLayer);
     map.addLayer({
       id:"municipis-line",
       type:"line",
@@ -128,44 +199,57 @@ button{
       }
     });
 
-    counts.addLayer += 1;
-    log("addLayer outline-line #" + counts.addLayer);
     map.addLayer({
       id:"outline-line",
       type:"line",
       source:"outline",
-      paint:{ "line-color":"#9E9E9E","line-width":1.2 }
+      paint:{
+        "line-color":"#9E9E9E",
+        "line-width":1.2
+      }
     });
 
-    counts.fitBounds += 1;
-    log("fitBounds inicial #" + counts.fitBounds);
+    log("fitBounds inicial");
     map.fitBounds(catBounds,{padding:60,animate:false});
-
-    map.once("idle", () => {
-      const z = map.getZoom();
-      map.setMinZoom(z);
-      map.setMaxZoom(z + 5);
-      map.setMaxBounds(catBounds);
-      loadingEl.style.display = "none";
-      log("idle inicial. zoom mínim fixat a " + z.toFixed(3));
-    });
   });
 
-  map.on("resize", () => {
-    counts.mapResize += 1;
-    log("map.resize event #" + counts.mapResize);
+  map.on("sourcedata", (e) => {
+    if (e.sourceId === "municipis" && e.isSourceLoaded && sourceLoadedAt === null) {
+      sourceLoadedAt = performance.now();
+      log("EVENT sourcedata municipis loaded = " + fmtMs(sourceLoadedAt - t0));
+    }
+  });
+
+  map.on("idle", () => {
+    if (idleAt !== null) return;
+    idleAt = performance.now();
+
+    const mapRect = mapEl.getBoundingClientRect();
+    log("");
+    log("DESPRÉS D'IDLE");
+    log("contenidor #map = " + Math.round(mapRect.width) + " x " + Math.round(mapRect.height));
+
+    const canvas = map.getCanvas();
+    const canvasRect = canvas.getBoundingClientRect();
+    log("canvas MapLibre = " + Math.round(canvasRect.width) + " x " + Math.round(canvasRect.height));
+
+    log("");
+    if (sourceLoadedAt !== null) {
+      log("temps fins source municipis carregada = " + fmtMs(sourceLoadedAt - t0));
+    } else {
+      log("temps fins source municipis carregada = no detectat");
+    }
+    log("temps fins idle inicial = " + fmtMs(idleAt - t0));
+
+    const z = map.getZoom();
+    log("zoom inicial final = " + z.toFixed(3));
+    loadingEl.textContent = "Diagnòstic complet";
   });
 
   window.addEventListener("resize", () => {
-    counts.resizeEvent += 1;
-    log("window.resize #" + counts.resizeEvent + " (NO fem fitBounds aquí)");
+    const r = mapEl.getBoundingClientRect();
+    log("window.resize -> contenidor #map = " + Math.round(r.width) + " x " + Math.round(r.height));
   });
-
-  document.getElementById("centerBtn").onclick = () => {
-    counts.fitBounds += 1;
-    log("fitBounds boto centrar #" + counts.fitBounds);
-    map.fitBounds(catBounds,{padding:60,animate:false});
-  };
 })();
 </script>
 </body>
