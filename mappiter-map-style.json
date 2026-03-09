@@ -1,0 +1,39 @@
+{
+  "background": {
+    "top": "#dce9f3",
+    "mid": "#a8c1d7",
+    "bottom": "#7fa3c3"
+  },
+  "outline": {
+    "lineColor": "#9E9E9E",
+    "lineWidth": 1.2
+  },
+  "municipis": {
+    "fill": {
+      "none": "#F7F7F5",
+      "marked": "#8FB58A",
+      "experience": "#3F6B3A",
+      "goal": "#B88A2E",
+      "route": "#4F7A8A"
+    },
+    "lineColor": "#B8B8B8",
+    "lineWidth": [
+      "interpolate",
+      [
+        "linear"
+      ],
+      [
+        "zoom"
+      ],
+      6,
+      0.3,
+      8,
+      0.6,
+      10,
+      1.0
+    ],
+    "selectedLineColor": "#707070",
+    "selectedLineWidth": 1.2,
+    "selectFlashMs": 150
+  }
+}
