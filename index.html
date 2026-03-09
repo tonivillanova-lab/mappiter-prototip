@@ -1,406 +1,184 @@
 <!doctype html>
 <html lang="ca">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#a8c1d7" />
-  <title>Mappiter · MapLibre base</title>
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
-  <style>
-    :root {
-      --top-band-h: 58px;
-      --pill-shadow: 0 6px 16px rgba(0,0,0,.16);
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { overflow: hidden; }
-    #app {
-      position: fixed; inset: 0;
-      background:
-        radial-gradient(120% 90% at 50% 10%, rgba(255,255,255,.58) 0%, rgba(255,255,255,0) 55%),
-        linear-gradient(180deg, var(--bg-top, #dce9f3) 0%, var(--bg-mid, #a8c1d7) 52%, var(--bg-bottom, #7fa3c3) 100%);
-    }
-    #topBand {
-      position: fixed; left: 0; right: 0; top: 0; height: var(--top-band-h);
-      background: rgba(255,255,255,.98);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,.08);
-      z-index: 20;
-    }
-    #topBand img {
-      height: 170px; width: auto; margin-top: 18px; display: block;
-      max-width: 82vw; object-fit: contain;
-    }
-    #map { position: fixed; inset: var(--top-band-h) 0 0 0; }
-    .fab, .pill {
-      border: none;
-      box-shadow: var(--pill-shadow);
-      background: rgba(255,255,255,.96);
-    }
-    .fab {
-      position: fixed; right: 16px; width: 48px; height: 48px;
-      border-radius: 999px; z-index: 30;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; color: #30343a;
-    }
-    #btnGoals { top: 72px; }
-    #btnCenter { bottom: 110px; }
-    .dock {
-      position: fixed; left: 12px; right: 12px; bottom: 22px;
-      display: flex; justify-content: space-between; z-index: 30;
-    }
-    .pill {
-      height: 56px; min-width: 122px; border-radius: 999px;
-      padding: 0 22px; font-weight: 900; font-size: 17px;
-    }
-    #btnAdd {
-      background: #3F6B3A; color: #fff;
-    }
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mappiter</title>
 
-    #sheetBackdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,.26);
-      z-index: 39; display: none;
-    }
-    #muniSheet {
-      position: fixed; left: 0; right: 0; bottom: 0;
-      min-height: 180px; max-height: 72vh;
-      background: rgba(255,255,255,.98);
-      border-radius: 24px 24px 0 0;
-      box-shadow: 0 -8px 26px rgba(0,0,0,.16);
-      z-index: 40;
-      transform: translateY(105%);
-      transition: transform .22s ease;
-      padding: 10px 14px 18px;
-    }
-    #muniSheet.open { transform: translateY(0); }
-    #sheetBackdrop.open { display: block; }
-    .grab {
-      width: 42px; height: 5px; border-radius: 999px;
-      background: rgba(0,0,0,.16); margin: 2px auto 12px;
-    }
-    .sheetHead {
-      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
-    }
-    .sheetTitle { font-size: 18px; font-weight: 900; line-height: 1.15; }
-    .sheetMeta { margin-top: 4px; color: #666; font-size: 13px; }
-    .sheetClose {
-      width: 40px; height: 40px; border-radius: 14px;
-      border: 1px solid rgba(0,0,0,.1); background: #fff; font-size: 18px;
-    }
-    .sheetActions {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;
-    }
-    .actionBtn {
-      height: 46px; border-radius: 16px; border: 1px solid rgba(0,0,0,.1);
-      background: #fff; font-weight: 800;
-    }
-    .actionBtn.primary {
-      background: rgba(63,107,58,.10);
-      border-color: rgba(63,107,58,.35);
-    }
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
 
-    #status {
-      position: fixed; left: 50%; top: calc(50% + 12px);
-      transform: translate(-50%,-50%);
-      z-index: 50;
-      background: rgba(255,255,255,.95);
-      border-radius: 18px; padding: 14px 18px;
-      box-shadow: 0 10px 22px rgba(0,0,0,.10);
-      font-weight: 800;
-    }
-    .hidden { display: none !important; }
+<style>
+html,body{
+margin:0;
+height:100%;
+font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
 
-    .maplibregl-ctrl-bottom-right,
-    .maplibregl-ctrl-bottom-left,
-    .maplibregl-ctrl-top-right,
-    .maplibregl-ctrl-top-left { display: none !important; }
-  </style>
+#topBand{
+position:fixed;
+top:0;
+left:0;
+right:0;
+height:60px;
+background:#ffffff;
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:10;
+box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+
+#topBand img{
+height:80px;
+max-width:90vw;
+object-fit:contain;
+}
+
+#map{
+position:absolute;
+top:60px;
+bottom:0;
+left:0;
+right:0;
+}
+
+#centerBtn{
+position:fixed;
+right:16px;
+bottom:120px;
+width:46px;
+height:46px;
+border-radius:999px;
+background:white;
+border:none;
+box-shadow:0 4px 12px rgba(0,0,0,0.25);
+font-size:20px;
+z-index:20;
+}
+
+</style>
 </head>
+
 <body>
-<div id="app">
-  <div id="topBand">
-    <img src="logo_mappiter_verd_sensefons.png" alt="Mappiter" />
-  </div>
 
-  <div id="map"></div>
-  <div id="status">Carregant mapa…</div>
-
-  <button id="btnGoals" class="fab" aria-label="Fites">☆</button>
-  <button id="btnCenter" class="fab" aria-label="Centrar">⌖</button>
-
-  <div class="dock">
-    <button id="btnTerritori" class="pill">Territori</button>
-    <button id="btnAdd" class="pill">+ Afegir</button>
-  </div>
-
-  <div id="sheetBackdrop"></div>
-  <div id="muniSheet" aria-modal="true" role="dialog">
-    <div class="grab"></div>
-    <div class="sheetHead">
-      <div>
-        <div id="sheetTitle" class="sheetTitle">Municipi</div>
-        <div id="sheetMeta" class="sheetMeta">—</div>
-      </div>
-      <button id="sheetClose" class="sheetClose" aria-label="Tancar">×</button>
-    </div>
-    <div class="sheetActions">
-      <button id="btnMark" class="actionBtn primary">Marcar municipi</button>
-      <button id="btnExperience" class="actionBtn">+ Vivència</button>
-      <button id="btnGoal" class="actionBtn">+ Fita</button>
-      <button id="btnRoute" class="actionBtn">+ Ruta</button>
-    </div>
-  </div>
+<div id="topBand">
+<img src="logo_mappiter_verd_sensefons.png">
 </div>
 
+<div id="map"></div>
+
+<button id="centerBtn">⌖</button>
+
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
 <script>
-(async function () {
-  const statusEl = document.getElementById('status');
-  const [styleCfg, municipis, outline] = await Promise.all([
-    fetch('mappiter-map-style.json').then(r => r.json()),
-    fetch('municipis_icgc.json').then(r => r.json()),
-    fetch('catalunya_outline.json').then(r => r.json())
-  ]);
 
-  const bg = styleCfg.background;
-  document.documentElement.style.setProperty('--bg-top', bg.top);
-  document.documentElement.style.setProperty('--bg-mid', bg.mid);
-  document.documentElement.style.setProperty('--bg-bottom', bg.bottom);
+async function start(){
 
-  function boundsFromFeatureCollection(fc) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    function scanCoords(coords) {
-      if (typeof coords[0] === 'number') {
-        const x = coords[0], y = coords[1];
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      } else {
-        coords.forEach(scanCoords);
-      }
-    }
-    fc.features.forEach(f => scanCoords(f.geometry.coordinates));
-    return [[minX, minY], [maxX, maxY]];
-  }
+const municipis = await fetch("municipis_icgc.json").then(r=>r.json());
+const outline = await fetch("catalunya_outline.json").then(r=>r.json());
 
-  const catBounds = boundsFromFeatureCollection(outline);
+function bounds(fc){
 
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: {
-      version: 8,
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      sources: {},
-      layers: []
-    },
-    center: [1.6, 41.8],
-    zoom: 6,
-    attributionControl: false,
-    dragRotate: false,
-    pitchWithRotate: false,
-    touchPitch: false,
-    maxPitch: 0
-  });
+let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
 
-  let initialFitDone = false;
-  let selectedId = null;
-  let goalsMode = false;
-  const stateByMunicipi = new Map(); // CODIMUNI -> state
-  const sourceName = 'municipis';
-  const outlineSourceName = 'catalunya-outline';
-  const fillLayerId = 'municipis-fill';
-  const lineLayerId = 'municipis-line';
-  const outlineLayerId = 'catalunya-outline-line';
+function scan(c){
+if(typeof c[0]=="number"){
+minX=Math.min(minX,c[0]);
+minY=Math.min(minY,c[1]);
+maxX=Math.max(maxX,c[0]);
+maxY=Math.max(maxY,c[1]);
+}else{
+c.forEach(scan);
+}
+}
 
-  const SHEET = {
-    backdrop: document.getElementById('sheetBackdrop'),
-    sheet: document.getElementById('muniSheet'),
-    title: document.getElementById('sheetTitle'),
-    meta: document.getElementById('sheetMeta'),
-    close: document.getElementById('sheetClose'),
-    btnMark: document.getElementById('btnMark'),
-    btnExperience: document.getElementById('btnExperience'),
-    btnGoal: document.getElementById('btnGoal'),
-    btnRoute: document.getElementById('btnRoute')
-  };
+fc.features.forEach(f=>scan(f.geometry.coordinates));
 
-  function closeSheet() {
-    SHEET.backdrop.classList.remove('open');
-    SHEET.sheet.classList.remove('open');
-    if (selectedId) {
-      map.setFeatureState({ source: sourceName, id: selectedId }, { selected: false, flash: false });
-      selectedId = null;
-    }
-  }
+return [[minX,minY],[maxX,maxY]];
 
-  function stateColorExpression() {
-    const fill = styleCfg.municipis.fill;
-    return [
-      'match',
-      ['coalesce', ['feature-state', 'status'], 'none'],
-      'marked', fill.marked,
-      'experience', fill.experience,
-      'goal', fill.goal,
-      'route', fill.route,
-      fill.none
-    ];
-  }
+}
 
-  function lineColorExpression() {
-    return [
-      'case',
-      ['boolean', ['feature-state', 'selected'], false], styleCfg.municipis.selectedLineColor,
-      styleCfg.municipis.lineColor
-    ];
-  }
+const catBounds=bounds(outline);
 
-  function lineWidthExpression() {
-    return [
-      'case',
-      ['boolean', ['feature-state', 'selected'], false], styleCfg.municipis.selectedLineWidth,
-      styleCfg.municipis.lineWidth
-    ];
-  }
+const map=new maplibregl.Map({
+container:"map",
+style:{
+version:8,
+sources:{},
+layers:[]
+},
+attributionControl:false
+});
 
-  function openSheetFor(feature) {
-    const props = feature.properties;
-    SHEET.title.textContent = props.NOMMUNI || 'Municipi';
-    SHEET.meta.textContent = `${props.NOMCOMAR || '—'} · ${props.NOMPROV || '—'}`;
-    SHEET.backdrop.classList.add('open');
-    SHEET.sheet.classList.add('open');
-  }
+map.on("load",()=>{
 
-  function applyStatus(codimuni, status) {
-    stateByMunicipi.set(codimuni, status);
-    map.setFeatureState({ source: sourceName, id: codimuni }, { status });
-  }
+map.addSource("municipis",{
+type:"geojson",
+data:municipis,
+promoteId:"CODIMUNI"
+});
 
-  function selectMunicipi(feature) {
-    const id = feature.id;
-    if (!id) return;
-    if (selectedId && selectedId !== id) {
-      map.setFeatureState({ source: sourceName, id: selectedId }, { selected: false, flash: false });
-    }
-    selectedId = id;
+map.addSource("outline",{
+type:"geojson",
+data:outline
+});
 
-    // flash
-    map.setFeatureState({ source: sourceName, id }, { flash: true, selected: true });
-    setTimeout(() => {
-      if (selectedId === id) {
-        map.setFeatureState({ source: sourceName, id }, { flash: false, selected: true });
-      }
-    }, styleCfg.municipis.selectFlashMs || 150);
+map.addLayer({
+id:"municipis-fill",
+type:"fill",
+source:"municipis",
+paint:{
+"fill-color":"#f4f4f2"
+}
+});
 
-    openSheetFor(feature);
-  }
+map.addLayer({
+id:"municipis-line",
+type:"line",
+source:"municipis",
+paint:{
+"line-color":"#B8B8B8",
+"line-width":[
+"interpolate",
+["linear"],
+["zoom"],
+6,0.5,
+8,0.8,
+10,1.2
+]
+}
+});
 
-  map.on('load', () => {
-    // attach stable ids to features from CODIMUNI
-    municipis.features = municipis.features.map(f => {
-      f.id = f.properties.CODIMUNI;
-      return f;
-    });
+map.addLayer({
+id:"outline-line",
+type:"line",
+source:"outline",
+paint:{
+"line-color":"#9E9E9E",
+"line-width":1.2
+}
+});
 
-    map.addSource(outlineSourceName, {
-      type: 'geojson',
-      data: outline
-    });
+map.fitBounds(catBounds,{padding:20});
 
-    map.addSource(sourceName, {
-      type: 'geojson',
-      data: municipis,
-      promoteId: 'CODIMUNI'
-    });
+map.once("idle",()=>{
+const z=map.getZoom();
+map.setMinZoom(z);
+map.setMaxBounds(catBounds);
+});
 
-    map.addLayer({
-      id: fillLayerId,
-      type: 'fill',
-      source: sourceName,
-      paint: {
-        'fill-color': stateColorExpression(),
-        'fill-opacity': 1
-      }
-    });
+});
 
-    map.addLayer({
-      id: lineLayerId,
-      type: 'line',
-      source: sourceName,
-      paint: {
-        'line-color': lineColorExpression(),
-        'line-width': lineWidthExpression()
-      }
-    });
+document.getElementById("centerBtn").onclick=()=>{
+map.fitBounds(catBounds,{padding:20});
+};
 
-    map.addLayer({
-      id: outlineLayerId,
-      type: 'line',
-      source: outlineSourceName,
-      paint: {
-        'line-color': styleCfg.outline.lineColor,
-        'line-width': styleCfg.outline.lineWidth
-      }
-    });
+}
 
-    map.fitBounds(catBounds, { padding: { top: 16, right: 16, bottom: 16, left: 16 }, duration: 0 });
+start();
 
-    map.once('idle', () => {
-      const initialZoom = map.getZoom();
-      map.setMinZoom(initialZoom);
-      map.setMaxBounds(catBounds);
-      initialFitDone = true;
-      statusEl.classList.add('hidden');
-    });
-
-    map.on('click', fillLayerId, (e) => {
-      if (!e.features || !e.features.length) return;
-      selectMunicipi(e.features[0]);
-    });
-
-    map.on('mouseenter', fillLayerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', fillLayerId, () => { map.getCanvas().style.cursor = ''; });
-  });
-
-  document.getElementById('btnCenter').addEventListener('click', () => {
-    if (!initialFitDone) return;
-    map.fitBounds(catBounds, { padding: { top: 16, right: 16, bottom: 16, left: 16 }, duration: 0 });
-    closeSheet();
-  });
-
-  document.getElementById('btnGoals').addEventListener('click', function () {
-    goalsMode = !goalsMode;
-    this.textContent = goalsMode ? '★' : '☆';
-    this.style.background = goalsMode ? styleCfg.municipis.fill.goal : 'rgba(255,255,255,.96)';
-    this.style.color = goalsMode ? '#fff' : '#30343a';
-    document.getElementById('btnAdd').textContent = goalsMode ? '+ Afegir fita' : '+ Afegir';
-  });
-
-  SHEET.backdrop.addEventListener('click', closeSheet);
-  SHEET.close.addEventListener('click', closeSheet);
-
-  // Distinguish selecting from marking
-  SHEET.btnMark.addEventListener('click', () => {
-    if (!selectedId) return;
-    applyStatus(selectedId, 'marked');
-    closeSheet();
-  });
-  SHEET.btnExperience.addEventListener('click', () => {
-    if (!selectedId) return;
-    applyStatus(selectedId, 'experience');
-    closeSheet();
-  });
-  SHEET.btnGoal.addEventListener('click', () => {
-    if (!selectedId) return;
-    applyStatus(selectedId, 'goal');
-    closeSheet();
-  });
-  SHEET.btnRoute.addEventListener('click', () => {
-    if (!selectedId) return;
-    applyStatus(selectedId, 'route');
-    closeSheet();
-  });
-})();
 </script>
+
 </body>
 </html>
