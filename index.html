@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Mappiter diagnòstic rendiment</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+:root{ --header-h:60px; }
+html,body{
+  margin:0;
+  height:100%;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background:#fff;
+}
+body{
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+  overflow:hidden;
+}
+#topBand{
+  height:var(--header-h);
+  min-height:var(--header-h);
+  max-height:var(--header-h);
+  flex:0 0 var(--header-h);
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-bottom:1px solid rgba(0,0,0,.08);
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+  z-index:10;
+}
+#topBand img{
+  height:55px;
+  max-width:90vw;
+  object-fit:contain;
+}
+#mapWrap{
+  position:relative;
+  flex:1 1 auto;
+  min-height:0;
+}
+#map{ position:absolute; inset:0; }
+#centerBtn{
+  position:fixed;
+  right:16px;
+  bottom:120px;
+  width:46px;
+  height:46px;
+  border-radius:999px;
+  background:#fff;
+  border:none;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+  font-size:20px;
+  z-index:20;
+}
+#loading{
+  position:fixed;
+  left:12px;
+  top:72px;
+  z-index:30;
+  background:rgba(255,255,255,.96);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  padding:8px 10px;
+  font-weight:700;
+}
+#debug{
+  position:fixed;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  max-height:38vh;
+  overflow:auto;
+  z-index:30;
+  background:rgba(255,255,255,.97);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:14px;
+  padding:10px 12px;
+  font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
+  white-space:pre-wrap;
+  box-shadow:0 8px 20px rgba(0,0,0,.14);
+}
+</style>
+</head>
+<body>
+<div id="topBand"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
+<div id="mapWrap"><div id="map"></div></div>
+<div id="loading">Diagnòstic rendiment…</div>
+<div id="debug"></div>
+<button id="centerBtn">⌖</button>
+
+<script>
+const T0 = performance.now();
+const marks = {};
+function mark(name){ marks[name] = performance.now(); }
+mark("script_start");
+</script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+(async function(){
+  const debugEl = document.getElementById('debug');
+  const loadingEl = document.getElementById('loading');
+
+  function log(msg){
+    debugEl.textContent += msg + "\n";
+    console.log(msg);
+  }
+  function fmt(ms){ return (Math.round(ms * 10) / 10) + " ms"; }
+  function bounds(fc){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    function scan(c){
+      if(typeof c[0]==="number"){
+        minX=Math.min(minX,c[0]); minY=Math.min(minY,c[1]);
+        maxX=Math.max(maxX,c[0]); maxY=Math.max(maxY,c[1]);
+      }else c.forEach(scan);
+    }
+    fc.features.forEach(f=>scan(f.geometry.coordinates));
+    return [[minX,minY],[maxX,maxY]];
+  }
+  function resTimingContains(part){
+    return performance.getEntriesByType("resource").find(e => e.name.includes(part));
+  }
+
+  log("=== DIAGNÒSTIC RENDIMENT ===");
+  log("No es toca la lògica de càmera excepte padding fit inicial = 36");
+
+  // index.html and external resources timing
+  window.addEventListener("load", () => {
+    mark("window_load");
+    const nav = performance.getEntriesByType("navigation")[0];
+    if (nav){
+      log("");
+      log("index.html / navegació");
+      log("- domContentLoaded = " + fmt(nav.domContentLoadedEventEnd));
+      log("- loadEventEnd = " + fmt(nav.loadEventEnd));
+      log("- transferSize = " + nav.transferSize + " bytes");
+      log("- encodedBodySize = " + nav.encodedBodySize + " bytes");
+      log("- decodedBodySize = " + nav.decodedBodySize + " bytes");
+    }
+  }, {once:true});
+
+  mark("before_fetch");
+  const a = performance.now();
+  const municipisRes = await fetch("municipis_icgc_simplificat.json",{cache:"default"});
+  const b = performance.now();
+  const municipisText = await municipisRes.text();
+  const c = performance.now();
+  const municipis = JSON.parse(municipisText);
+  const d = performance.now();
+  mark("after_parse");
+
+  municipis.features = municipis.features.map(f => {
+    if (f.properties && f.properties.CODIMUNI != null) f.id = f.properties.CODIMUNI;
+    return f;
+  });
+  const catBounds = bounds(municipis);
+
+  log("");
+  log("municipis_icgc_simplificat.json");
+  log("- bytes text = " + municipisText.length);
+  log("- MB decimals = " + (municipisText.length / 1000000).toFixed(2));
+  log("- fetch headers = " + fmt(b - a));
+  log("- lectura text = " + fmt(c - b));
+  log("- parse JSON = " + fmt(d - c));
+  log("- total fetch+parse = " + fmt(d - a));
+
+  const rtMunicipis = resTimingContains("municipis_icgc_simplificat.json");
+  if (rtMunicipis){
+    log("- resource transferSize = " + rtMunicipis.transferSize + " bytes");
+    log("- resource encodedBodySize = " + rtMunicipis.encodedBodySize + " bytes");
+    log("- resource decodedBodySize = " + rtMunicipis.decodedBodySize + " bytes");
+    log("- resource duration = " + fmt(rtMunicipis.duration));
+  } else {
+    log("- resource timing municipis = no disponible");
+  }
+
+  const rtCss = resTimingContains("maplibre-gl.css");
+  const rtJs = resTimingContains("maplibre-gl.js");
+  log("");
+  log("recursos externs");
+  log("- maplibre css duration = " + (rtCss ? fmt(rtCss.duration) : "n/d"));
+  log("- maplibre js duration = " + (rtJs ? fmt(rtJs.duration) : "n/d"));
+
+  mark("before_map_create");
+  const map = new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{},layers:[]},
+    attributionControl:false,
+    renderWorldCopies:false,
+    dragRotate:false,
+    pitchWithRotate:false,
+    touchPitch:false,
+    doubleClickZoom:false
+  });
+  mark("after_map_create");
+  log("");
+  log("map create = " + fmt(marks.after_map_create - marks.before_map_create));
+
+  let firstRenderLogged = False = false;
+  let sourceLoadedAt = null;
+  let firstIdleAt = null;
+
+  map.on("render", () => {
+    if (firstRenderLogged) return;
+    firstRenderLogged = true;
+    mark("first_render");
+    log("primer render visible = " + fmt(marks.first_render - T0));
+  });
+
+  map.on("sourcedata", (e) => {
+    if (e.sourceId === "municipis" && e.isSourceLoaded && sourceLoadedAt === null){
+      sourceLoadedAt = performance.now();
+      log("source municipis carregada = " + fmt(sourceLoadedAt - T0));
+    }
+  });
+
+  function fitInitial(){
+    map.resize();
+    map.fitBounds(catBounds, { padding: 36, animate:false });
+  }
+
+  map.on("load", () => {
+    mark("map_load");
+    log("map load = " + fmt(marks.map_load - T0));
+
+    map.addSource("municipis", { type:"geojson", data:municipis, promoteId:"CODIMUNI" });
+    log("addSource municipis = " + fmt(performance.now() - T0));
+
+    map.addLayer({
+      id:"municipis-fill",
+      type:"fill",
+      source:"municipis",
+      paint:{ "fill-color":"#f4f4f2" }
+    });
+
+    map.addLayer({
+      id:"municipis-line",
+      type:"line",
+      source:"municipis",
+      paint:{
+        "line-color":"#B8B8B8",
+        "line-width":[
+          "interpolate",["linear"],["zoom"],
+          6,0.5,
+          8,0.8,
+          10,1.2
+        ]
+      }
+    });
+    log("addLayers completat = " + fmt(performance.now() - T0));
+
+    fitInitial();
+    log("fitInitial aplicat = " + fmt(performance.now() - T0));
+
+    map.once("idle", () => {
+      firstIdleAt = performance.now();
+      log("idle inicial = " + fmt(firstIdleAt - T0));
+      loadingEl.textContent = "Diagnòstic complet";
+      map.setMinZoom(map.getZoom());
+    });
+  });
+
+  document.getElementById("centerBtn").addEventListener("click", fitInitial);
+
+  setTimeout(() => {
+    log("");
+    log("resum");
+    if (sourceLoadedAt !== null) log("- temps fins source loaded = " + fmt(sourceLoadedAt - T0));
+    if (firstIdleAt !== null) log("- temps fins idle inicial = " + fmt(firstIdleAt - T0));
+    if (marks.first_render) log("- temps fins primer render visible = " + fmt(marks.first_render - T0));
+  }, 1800);
+})();
+</script>
+</body>
+</html>
