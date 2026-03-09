@@ -2,210 +2,171 @@
 <html lang="ca">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Mappiter</title>
-
-<link rel="preload" href="municipis_icgc.json" as="fetch" crossorigin="anonymous">
-<link rel="preload" href="catalunya_outline.json" as="fetch" crossorigin="anonymous">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Mappiter debug mapa</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
-
 <style>
-html,body{
-margin:0;
-height:100%;
-font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-background:#ffffff;
-}
-
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff}
 #topBand{
-position:fixed;
-top:0;
-left:0;
-right:0;
-height:60px;
-background:#ffffff;
-display:flex;
-align-items:center;
-justify-content:center;
-z-index:10;
-box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  position:fixed;top:0;left:0;right:0;height:60px;background:#fff;
+  display:flex;align-items:center;justify-content:center;z-index:10;
+  box-shadow:0 2px 6px rgba(0,0,0,.1)
 }
-
-#topBand img{
-height:55px;
-max-width:90vw;
-object-fit:contain;
-}
-
-#map{
-position:absolute;
-top:60px;
-bottom:0;
-left:0;
-right:0;
-}
-
-#centerBtn{
-position:fixed;
-right:16px;
-bottom:120px;
-width:46px;
-height:46px;
-border-radius:999px;
-background:white;
-border:none;
-box-shadow:0 4px 12px rgba(0,0,0,0.25);
-font-size:20px;
-z-index:20;
-}
-
+#topBand img{height:55px;max-width:90vw;object-fit:contain}
+#map{position:absolute;top:60px;left:0;right:0;bottom:0}
 #loading{
-position:fixed;
-left:50%;
-top:50%;
-transform:translate(-50%,-50%);
-background:#fff;
-padding:12px 16px;
-border-radius:14px;
-box-shadow:0 8px 18px rgba(0,0,0,.15);
-z-index:30;
-font-weight:700;
+  position:fixed;left:12px;top:72px;z-index:30;
+  background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;padding:8px 10px;font-weight:700
+}
+#debug{
+  position:fixed;left:12px;right:12px;bottom:12px;z-index:30;
+  background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.12);
+  border-radius:14px;padding:10px 12px;font:12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:36vh;overflow:auto;white-space:pre-wrap
+}
+button{
+  position:fixed;right:16px;bottom:16px;z-index:30;
+  width:46px;height:46px;border-radius:999px;border:none;background:white;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:20px
 }
 </style>
 </head>
-
 <body>
-
-<div id="topBand">
-<img src="logo_mappiter_verd_sensefons.png">
-</div>
-
+<div id="topBand"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
 <div id="map"></div>
 <div id="loading">Carregant mapa…</div>
-
+<div id="debug"></div>
 <button id="centerBtn">⌖</button>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-
 <script>
+(async function(){
+  const debugEl = document.getElementById('debug');
+  const loadingEl = document.getElementById('loading');
+  const counts = { createMap:0, addSource:0, addLayer:0, fitBounds:0, resizeEvent:0, mapResize:0 };
+  const lines = [];
 
-async function start(){
+  function log(msg){
+    const stamp = new Date().toLocaleTimeString('ca-ES', {hour12:false});
+    lines.push("[" + stamp + "] " + msg);
+    debugEl.textContent = lines.join("\n") + "\n\nCOUNTS:\n" + JSON.stringify(counts, null, 2);
+    console.log(msg);
+  }
 
-const municipis = await fetch("municipis_icgc.json",{cache:"default"}).then(r=>r.json());
-const outline = await fetch("catalunya_outline.json",{cache:"default"}).then(r=>r.json());
+  log("Inici script");
+  log("Comprovació estat guardat: NO hi ha cap ús de localStorage, sessionStorage o similars en aquesta versió.");
 
-function bounds(fc){
-let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-function scan(c){
-if(typeof c[0]=="number"){
-minX=Math.min(minX,c[0]);
-minY=Math.min(minY,c[1]);
-maxX=Math.max(maxX,c[0]);
-maxY=Math.max(maxY,c[1]);
-}else{
-c.forEach(scan);
-}
-}
-fc.features.forEach(f=>scan(f.geometry.coordinates));
-return [[minX,minY],[maxX,maxY]];
-}
+  function bounds(fc){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    function scan(c){
+      if(typeof c[0]==="number"){
+        minX=Math.min(minX,c[0]); minY=Math.min(minY,c[1]);
+        maxX=Math.max(maxX,c[0]); maxY=Math.max(maxY,c[1]);
+      }else c.forEach(scan);
+    }
+    fc.features.forEach(f=>scan(f.geometry.coordinates));
+    return [[minX,minY],[maxX,maxY]];
+  }
 
-const catBounds=bounds(outline);
+  log("Fetch municipis_icgc.json");
+  const municipis = await fetch("municipis_icgc.json",{cache:"default"}).then(r=>r.json());
+  log("Fetch catalunya_outline.json");
+  const outline = await fetch("catalunya_outline.json",{cache:"default"}).then(r=>r.json());
+  const catBounds = bounds(outline);
 
-const map=new maplibregl.Map({
-container:"map",
-style:{
-version:8,
-sources:{},
-layers:[]
-},
-center:[1.6,41.8],
-zoom:5,
-maxZoom:11,
-attributionControl:false,
-renderWorldCopies:false
-});
-
-function fitCatalunya(){
-map.resize();
-map.fitBounds(catBounds,{padding:80,duration:0});
-}
-
-map.on("load",()=>{
-
-map.addSource("municipis",{
-type:"geojson",
-data:municipis,
-promoteId:"CODIMUNI"
-});
-
-map.addSource("outline",{
-type:"geojson",
-data:outline
-});
-
-map.addLayer({
-id:"municipis-fill",
-type:"fill",
-source:"municipis",
-paint:{
-"fill-color":"#f4f4f2"
-}
-});
-
-map.addLayer({
-id:"municipis-line",
-type:"line",
-source:"municipis",
-paint:{
-"line-color":"#B8B8B8",
-"line-width":[
-"interpolate",
-["linear"],
-["zoom"],
-6,0.5,
-8,0.8,
-10,1.2
-]
-}
-});
-
-map.addLayer({
-id:"outline-line",
-type:"line",
-source:"outline",
-paint:{
-"line-color":"#9E9E9E",
-"line-width":1.2
-}
-});
-
-// wait one frame so the map container has its real size
-requestAnimationFrame(()=>{
-  fitCatalunya();
-  map.once("idle",()=>{
-    const z=map.getZoom();
-    map.setMinZoom(z);
-    map.setMaxBounds(catBounds);
-    document.getElementById("loading").style.display="none";
+  counts.createMap += 1;
+  log("createMap #" + counts.createMap);
+  const map = new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{},layers:[]},
+    attributionControl:false,
+    renderWorldCopies:false,
+    dragRotate:false,
+    pitchWithRotate:false,
+    touchPitch:false,
+    doubleClickZoom:false
   });
-});
 
-});
+  municipis.features = municipis.features.map(f => {
+    f.id = f.properties.CODIMUNI;
+    return f;
+  });
 
-document.getElementById("centerBtn").onclick=()=>{
-fitCatalunya();
-};
+  map.on("load", () => {
+    counts.addSource += 1;
+    log("addSource municipis #" + counts.addSource);
+    map.addSource("municipis",{ type:"geojson", data:municipis, promoteId:"CODIMUNI" });
 
-window.addEventListener("resize",()=>{
-  fitCatalunya();
-});
+    counts.addSource += 1;
+    log("addSource outline #" + counts.addSource);
+    map.addSource("outline",{ type:"geojson", data:outline });
 
-}
+    counts.addLayer += 1;
+    log("addLayer municipis-fill #" + counts.addLayer);
+    map.addLayer({
+      id:"municipis-fill",
+      type:"fill",
+      source:"municipis",
+      paint:{ "fill-color":"#f4f4f2" }
+    });
 
-start();
+    counts.addLayer += 1;
+    log("addLayer municipis-line #" + counts.addLayer);
+    map.addLayer({
+      id:"municipis-line",
+      type:"line",
+      source:"municipis",
+      paint:{
+        "line-color":"#B8B8B8",
+        "line-width":[
+          "interpolate",["linear"],["zoom"],
+          6,0.5,
+          8,0.8,
+          10,1.2
+        ]
+      }
+    });
 
+    counts.addLayer += 1;
+    log("addLayer outline-line #" + counts.addLayer);
+    map.addLayer({
+      id:"outline-line",
+      type:"line",
+      source:"outline",
+      paint:{ "line-color":"#9E9E9E","line-width":1.2 }
+    });
+
+    counts.fitBounds += 1;
+    log("fitBounds inicial #" + counts.fitBounds);
+    map.fitBounds(catBounds,{padding:60,animate:false});
+
+    map.once("idle", () => {
+      const z = map.getZoom();
+      map.setMinZoom(z);
+      map.setMaxZoom(z + 5);
+      map.setMaxBounds(catBounds);
+      loadingEl.style.display = "none";
+      log("idle inicial. zoom mínim fixat a " + z.toFixed(3));
+    });
+  });
+
+  map.on("resize", () => {
+    counts.mapResize += 1;
+    log("map.resize event #" + counts.mapResize);
+  });
+
+  window.addEventListener("resize", () => {
+    counts.resizeEvent += 1;
+    log("window.resize #" + counts.resizeEvent + " (NO fem fitBounds aquí)");
+  });
+
+  document.getElementById("centerBtn").onclick = () => {
+    counts.fitBounds += 1;
+    log("fitBounds boto centrar #" + counts.fitBounds);
+    map.fitBounds(catBounds,{padding:60,animate:false});
+  };
+})();
 </script>
-
 </body>
 </html>
