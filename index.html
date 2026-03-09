@@ -8,7 +8,6 @@
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
 
 <style>
-
 html,body{
 margin:0;
 height:100%;
@@ -56,7 +55,6 @@ box-shadow:0 4px 12px rgba(0,0,0,0.25);
 font-size:20px;
 z-index:20;
 }
-
 </style>
 </head>
 
@@ -76,8 +74,8 @@ z-index:20;
 
 async function start(){
 
-const municipis = await fetch("municipis_icgc.json").then(r=>r.json());
-const outline = await fetch("catalunya_outline.json").then(r=>r.json());
+const municipis = await fetch("municipis_icgc.json",{cache:"force-cache"}).then(r=>r.json());
+const outline = await fetch("catalunya_outline.json",{cache:"force-cache"}).then(r=>r.json());
 
 function bounds(fc){
 
@@ -164,7 +162,7 @@ paint:{
 }
 });
 
-map.fitBounds(catBounds,{padding:20,duration:0});
+map.fitBounds(catBounds,{padding:40,duration:0});
 
 map.once("idle",()=>{
 const z=map.getZoom();
@@ -175,7 +173,7 @@ map.setMaxBounds(catBounds);
 });
 
 document.getElementById("centerBtn").onclick=()=>{
-map.fitBounds(catBounds,{padding:20,duration:0});
+map.fitBounds(catBounds,{padding:40,duration:0});
 };
 
 }
