@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Mappiter diagnòstic navegador/render</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+:root{ --header-h:60px; }
+html,body{
+  margin:0;
+  height:100%;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background:#fff;
+}
+body{
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+  overflow:hidden;
+}
+#topBand{
+  height:var(--header-h);
+  flex:0 0 var(--header-h);
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-bottom:1px solid rgba(0,0,0,.08);
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+}
+#topBand img{
+  height:55px;
+  max-width:90vw;
+  object-fit:contain;
+}
+#mapWrap{
+  position:relative;
+  flex:1 1 auto;
+  min-height:0;
+}
+#map{ position:absolute; inset:0; }
+#centerBtn{
+  position:fixed;
+  right:16px;
+  bottom:120px;
+  width:46px;
+  height:46px;
+  border-radius:999px;
+  background:#fff;
+  border:none;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+  font-size:20px;
+  z-index:20;
+}
+#loading{
+  position:fixed;
+  left:12px;
+  top:72px;
+  z-index:30;
+  background:rgba(255,255,255,.96);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  padding:8px 10px;
+  font-weight:700;
+}
+#debug{
+  position:fixed;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  max-height:42vh;
+  overflow:auto;
+  z-index:30;
+  background:rgba(255,255,255,.97);
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:14px;
+  padding:10px 12px;
+  font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
+  white-space:pre-wrap;
+  box-shadow:0 8px 20px rgba(0,0,0,.14);
+}
+</style>
+</head>
+<body>
+<div id="topBand"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
+<div id="mapWrap"><div id="map"></div></div>
+<div id="loading">Diagnòstic navegador/render…</div>
+<div id="debug"></div>
+<button id="centerBtn">⌖</button>
+
+<script>
+const T0 = performance.now();
+const LOGS = [];
+function log(msg){
+  const line = "[" + (performance.now()-T0).toFixed(1) + " ms] " + msg;
+  LOGS.push(line);
+  console.log(line);
+  const el = document.getElementById("debug");
+  if (el) el.textContent = LOGS.join("\n");
+}
+log("script start");
+log("document.visibilityState inicial = " + document.visibilityState);
+document.addEventListener("visibilitychange", () => log("EVENT visibilitychange -> " + document.visibilityState));
+window.addEventListener("pageshow", (e) => log("EVENT pageshow persisted=" + !!e.persisted));
+window.addEventListener("pagehide", (e) => log("EVENT pagehide persisted=" + !!e.persisted));
+window.addEventListener("freeze", () => log("EVENT freeze"));
+window.addEventListener("resume", () => log("EVENT resume"));
+document.addEventListener("DOMContentLoaded", () => log("EVENT DOMContentLoaded"));
+window.addEventListener("load", () => log("EVENT window.load"));
+let rafCount = 0, firstRafAt = null, lastRafAt = null, rafSlowGaps = 0, rafStop = false;
+function rafLoop(ts){
+  rafCount += 1;
+  if (firstRafAt === null) { firstRafAt = performance.now(); log("RAF first tick"); }
+  if (lastRafAt !== null) {
+    const gap = ts - lastRafAt;
+    if (gap > 250) { rafSlowGaps += 1; log("RAF gap > 250ms detectat: " + gap.toFixed(1) + " ms"); }
+  }
+  lastRafAt = ts;
+  if (!rafStop) requestAnimationFrame(rafLoop);
+}
+requestAnimationFrame(rafLoop);
+function dumpRects(prefix){
+  const wrap = document.getElementById("mapWrap");
+  const map = document.getElementById("map");
+  const wr = wrap.getBoundingClientRect();
+  const mr = map.getBoundingClientRect();
+  log(prefix + " mapWrap rect = " + Math.round(wr.width) + "x" + Math.round(wr.height) + " @ " + Math.round(wr.left) + "," + Math.round(wr.top));
+  log(prefix + " map rect = " + Math.round(mr.width) + "x" + Math.round(mr.height) + " @ " + Math.round(mr.left) + "," + Math.round(mr.top));
+}
+</script>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" onload="log('EVENT maplibre-gl.js load')"></script>
+<script>
+(async function(){
+  log("entrada funció principal");
+  dumpRects("abans fetch");
+  const mapEl = document.getElementById("map");
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      log("IntersectionObserver map ratio=" + e.intersectionRatio.toFixed(3) + " isIntersecting=" + e.isIntersecting);
+    });
+  }, {threshold:[0, 0.01, 0.25, 0.5, 0.75, 1]});
+  io.observe(mapEl);
+
+  function bounds(fc){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    function scan(c){
+      if(typeof c[0]==="number"){
+        minX=Math.min(minX,c[0]); minY=Math.min(minY,c[1]);
+        maxX=Math.max(maxX,c[0]); maxY=Math.max(maxY,c[1]);
+      } else c.forEach(scan);
+    }
+    fc.features.forEach(f=>scan(f.geometry.coordinates));
+    return [[minX,minY],[maxX,maxY]];
+  }
+
+  log("abans fetch municipis");
+  const municipis = await fetch("municipis_icgc_simplificat.json",{cache:"default"}).then(r=>r.json());
+  log("després fetch municipis");
+  municipis.features = municipis.features.map(f => {
+    if (f.properties && f.properties.CODIMUNI != null) f.id = f.properties.CODIMUNI;
+    return f;
+  });
+  const catBounds = bounds(municipis);
+  log("bounds calculats");
+
+  log("abans createMap()");
+  const map = new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{},layers:[]},
+    attributionControl:false,
+    renderWorldCopies:false,
+    dragRotate:false,
+    pitchWithRotate:false,
+    touchPitch:false,
+    doubleClickZoom:false
+  });
+  log("després createMap()");
+
+  function fitInitial(){
+    log("fitInitial()");
+    map.resize();
+    map.fitBounds(catBounds, {padding:36, animate:false});
+  }
+
+  map.on("load", () => {
+    log("EVENT map.load");
+    dumpRects("map.load");
+    map.addSource("municipis", {type:"geojson", data:municipis, promoteId:"CODIMUNI"});
+    log("addSource municipis");
+
+    map.addLayer({
+      id:"municipis-fill",
+      type:"fill",
+      source:"municipis",
+      paint:{ "fill-color":"#f4f4f2" }
+    });
+    log("addLayer municipis-fill");
+
+    map.addLayer({
+      id:"municipis-line",
+      type:"line",
+      source:"municipis",
+      paint:{
+        "line-color":"#B8B8B8",
+        "line-width":[
+          "interpolate",["linear"],["zoom"],
+          6,0.5,
+          8,0.8,
+          10,1.2
+        ]
+      }
+    });
+    log("addLayer municipis-line");
+
+    fitInitial();
+
+    const canvas = map.getCanvas();
+    if (canvas) {
+      log("canvas size al load = " + canvas.width + "x" + canvas.height);
+      canvas.addEventListener("webglcontextlost", (e) => {
+        log("EVENT webglcontextlost");
+        if (e && e.preventDefault) e.preventDefault();
+      });
+      canvas.addEventListener("webglcontextrestored", () => log("EVENT webglcontextrestored"));
+    } else {
+      log("canvas no disponible a map.load");
+    }
+  });
+
+  map.on("render", () => {
+    if (!window.__firstRenderLogged) {
+      window.__firstRenderLogged = true;
+      const canvas = map.getCanvas();
+      dumpRects("primer render");
+      log("EVENT primer render visible");
+      log("canvas size primer render = " + (canvas ? (canvas.width + "x" + canvas.height) : "n/d"));
+      log("document.visibilityState a primer render = " + document.visibilityState);
+      document.getElementById("loading").textContent = "Diagnòstic complet";
+    }
+  });
+
+  map.on("error", (e) => {
+    try{
+      log("EVENT map.error -> " + (e && e.error && e.error.message ? e.error.message : JSON.stringify(e)));
+    }catch(_){
+      log("EVENT map.error");
+    }
+  });
+
+  document.getElementById("centerBtn").addEventListener("click", fitInitial);
+
+  setTimeout(() => {
+    rafStop = true;
+    const canvas = document.querySelector("#map canvas");
+    dumpRects("1.5s");
+    log("RAF count 1.5s = " + rafCount);
+    log("RAF slow gaps = " + rafSlowGaps);
+    log("canvas present 1.5s = " + !!canvas);
+    if (canvas) log("canvas size 1.5s = " + canvas.width + "x" + canvas.height);
+    log("document.visibilityState final = " + document.visibilityState);
+  }, 1500);
+
+  setTimeout(() => {
+    const nav = performance.getEntriesByType("navigation")[0];
+    if (nav) {
+      log("navigation.type = " + nav.type);
+      log("navigation.domContentLoadedEventEnd = " + nav.domContentLoadedEventEnd.toFixed(1));
+      log("navigation.loadEventEnd = " + nav.loadEventEnd.toFixed(1));
+    }
+  }, 1700);
+})();
+</script>
+</body>
+</html>
