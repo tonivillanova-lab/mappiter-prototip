@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mappiter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08262B">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+:root{
+  --header-h:60px;
+  --bg-center:#0F3F46;
+  --bg-mid:#0C3238;
+  --bg-edge:#08262B;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; height:100%; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:#08262B; }
+body{
+  display:flex; flex-direction:column; min-height:100dvh; overflow:hidden;
+  background:
+    radial-gradient(120% 95% at 50% 48%, var(--bg-center) 0%, var(--bg-mid) 52%, var(--bg-edge) 100%);
+}
+header{
+  height:var(--header-h); flex:0 0 var(--header-h);
+  background:rgba(8,38,43,.84); color:#F3F1EC;
+  display:flex; align-items:center; justify-content:center;
+  border-bottom:1px solid rgba(243,241,236,.12);
+  font-weight:700; font-size:18px;
+  backdrop-filter: blur(6px);
+}
+#mapwrap{
+  position:relative; flex:1 1 auto; min-height:0;
+  background:
+    radial-gradient(120% 95% at 50% 48%, var(--bg-center) 0%, var(--bg-mid) 52%, var(--bg-edge) 100%);
+}
+#map{ position:absolute; inset:0; }
+button{
+  position:fixed; right:16px; width:48px; height:48px; border-radius:50%;
+  border:none; background:rgba(243,241,236,.96); color:#08262B;
+  box-shadow:0 4px 10px rgba(0,0,0,.25); z-index:20;
+}
+#center{ bottom:100px; }
+#status{
+  position:fixed; left:12px; top:72px;
+  background:rgba(8,38,43,.9); color:#F3F1EC;
+  border:1px solid rgba(243,241,236,.14); border-radius:12px;
+  padding:8px 10px; z-index:30; font-weight:700;
+}
+#legend{
+  position:fixed; left:12px; right:76px; bottom:12px;
+  background:rgba(8,38,43,.9); color:#F3F1EC;
+  border:1px solid rgba(243,241,236,.14); border-radius:14px;
+  padding:10px 12px; z-index:30; font-size:13px; line-height:1.35;
+  backdrop-filter: blur(6px);
+}
+.legend-row{ display:flex; align-items:center; gap:8px; margin-top:6px; }
+.legend-row:first-child{ margin-top:0; }
+.swatch{
+  width:14px; height:14px; border-radius:4px;
+  border:1px solid rgba(255,255,255,.18); flex:0 0 14px;
+}
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-right,.maplibregl-ctrl-top-left{
+  display:none!important;
+}
+</style>
+</head>
+<body>
+<header>Mappiter</header>
+<div id="mapwrap"><div id="map"></div></div>
+<div id="status">Carregant mapa…</div>
+<button id="center" aria-label="Centrar Catalunya">⌖</button>
+
+<div id="legend">
+  <div class="legend-row"><span class="swatch" style="background:#F3F1EC"></span> municipi no marcat</div>
+  <div class="legend-row"><span class="swatch" style="background:#1ECAD3"></span> municipi marcat</div>
+  <div class="legend-row"><span class="swatch" style="background:#0B4F8A"></span> municipi amb vivències</div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+function bounds(fc){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  function scan(c){
+    if(typeof c[0]==="number"){
+      minX=Math.min(minX,c[0]); minY=Math.min(minY,c[1]);
+      maxX=Math.max(maxX,c[0]); maxY=Math.max(maxY,c[1]);
+    } else {
+      c.forEach(scan);
+    }
+  }
+  fc.features.forEach(f=>scan(f.geometry.coordinates));
+  return [[minX,minY],[maxX,maxY]];
+}
+function expandBounds(b,f){
+  const minX=b[0][0], minY=b[0][1], maxX=b[1][0], maxY=b[1][1];
+  const dx=(maxX-minX)*f, dy=(maxY-minY)*f;
+  return [[minX-dx,minY-dy],[maxX+dx,maxY+dy]];
+}
+function clamp(n,min,max){ return Math.min(max, Math.max(min,n)); }
+
+document.addEventListener("DOMContentLoaded", init);
+
+async function init(){
+  const status=document.getElementById("status");
+  const municipis=await fetch("municipis_icgc_simplificat.json").then(r=>r.json());
+
+  municipis.features = municipis.features.map((f, i)=>{
+    if(f.properties && f.properties.CODIMUNI != null) f.id = f.properties.CODIMUNI;
+    if(!f.id) f.id = i + 1;
+    return f;
+  });
+
+  const catBounds=bounds(municipis);
+  const expandedBounds=expandBounds(catBounds,0.003);
+
+  const markedIds = municipis.features.slice(0, 18).map(f => f.id);
+  const vivenciaIds = municipis.features.slice(18, 36).map(f => f.id);
+
+  const map=new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{},layers:[]},
+    attributionControl:false,
+    renderWorldCopies:false,
+    dragRotate:false,
+    pitchWithRotate:false,
+    touchPitch:false
+  });
+
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
+
+  let initialCamera=null;
+  let suppress=false;
+
+  function centerMap(){
+    if(!initialCamera) return;
+    suppress=true;
+    map.jumpTo(initialCamera);
+    setTimeout(()=>suppress=false,0);
+  }
+
+  map.on("load",()=>{
+    map.addSource("municipis",{type:"geojson",data:municipis,promoteId:"id"});
+
+    map.addLayer({
+      id:"municipis-fill",
+      type:"fill",
+      source:"municipis",
+      paint:{
+        "fill-color":[
+          "case",
+          ["in", ["id"], ["literal", vivenciaIds]], "#0B4F8A",
+          ["in", ["id"], ["literal", markedIds]], "#1ECAD3",
+          "#F3F1EC"
+        ]
+      }
+    });
+
+    map.addLayer({
+      id:"municipis-line",
+      type:"line",
+      source:"municipis",
+      paint:{
+        "line-color":"#CFCBC3",
+        "line-width":["interpolate",["linear"],["zoom"],6,0.3,8,0.6,10,1.0]
+      }
+    });
+
+    map.resize();
+
+    initialCamera = map.cameraForBounds(catBounds,{padding:18});
+    initialCamera.bearing=0;
+    initialCamera.pitch=0;
+
+    map.jumpTo(initialCamera);
+
+    map.setMinZoom(6.1);
+    map.setMaxZoom(10.5);
+
+    status.style.display="none";
+  });
+
+  map.on("moveend",()=>{
+    if(suppress || !initialCamera) return;
+
+    const c=map.getCenter();
+    const minLng=expandedBounds[0][0];
+    const minLat=expandedBounds[0][1];
+    const maxLng=expandedBounds[1][0];
+    const maxLat=expandedBounds[1][1];
+
+    const lng=clamp(c.lng,minLng,maxLng);
+    const lat=clamp(c.lat,minLat,maxLat);
+
+    if(lng!==c.lng || lat!==c.lat){
+      suppress=true;
+      map.easeTo({
+        center:[lng,lat],
+        zoom:map.getZoom(),
+        duration:200,
+        essential:true
+      });
+      setTimeout(()=>suppress=false,220);
+    }
+  });
+
+  document.getElementById("center").addEventListener("click",centerMap);
+}
+</script>
+</body>
+</html>
