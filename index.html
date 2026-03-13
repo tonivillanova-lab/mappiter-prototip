@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mappiter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A2E39">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+:root{
+  --logo-top:14px;
+  --petrol-1:#123C4B;
+  --petrol-2:#0F3542;
+  --petrol-3:#0B2C36;
+  --petrol-4:#08262B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#08262B}
+body{
+  min-height:100dvh;overflow:hidden;position:relative;
+  background:
+    linear-gradient(180deg,var(--petrol-1) 0%,var(--petrol-2) 34%,var(--petrol-3) 68%,var(--petrol-4) 100%),
+    radial-gradient(140% 120% at 18% 14%, rgba(255,255,255,.045) 0%, rgba(255,255,255,0) 55%),
+    radial-gradient(120% 100% at 84% 22%, rgba(255,255,255,.025) 0%, rgba(255,255,255,0) 58%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.014) 0 2px, rgba(255,255,255,0) 2px 7px),
+    repeating-linear-gradient(45deg, rgba(0,0,0,.03) 0 1px, rgba(0,0,0,0) 1px 6px);
+}
+#logoWrap{
+  position:fixed;top:var(--logo-top);left:50%;transform:translateX(-50%);
+  z-index:30;pointer-events:none;
+}
+#logoWrap img{height:42px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.18))}
+#mapwrap{position:fixed;inset:0}
+#shadowCanvas{position:absolute;inset:0;z-index:0;pointer-events:none}
+#map{position:absolute;inset:0;z-index:1}
+button{
+  position:fixed;right:16px;width:48px;height:48px;border-radius:50%;border:none;
+  background:rgba(243,241,236,.96);color:#08262B;box-shadow:0 4px 10px rgba(0,0,0,.25);z-index:20;
+}
+#center{bottom:100px}
+#status{
+  position:fixed;left:12px;top:64px;background:rgba(8,38,43,.9);color:#F3F1EC;
+  border:1px solid rgba(243,241,236,.14);border-radius:12px;padding:8px 10px;z-index:30;font-weight:700;
+}
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-right,.maplibregl-ctrl-top-left{display:none!important}
+</style>
+</head>
+<body>
+<div id="logoWrap"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
+<div id="mapwrap"><canvas id="shadowCanvas"></canvas><div id="map"></div></div>
+<div id="status">Carregant mapa…</div>
+<button id="center" aria-label="Centrar Catalunya">⌖</button>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+function bounds(fc){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  function scan(c){
+    if(typeof c[0]==="number"){
+      minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);
+    } else { c.forEach(scan); }
+  }
+  fc.features.forEach(f=>scan(f.geometry.coordinates));
+  return [[minX,minY],[maxX,maxY]];
+}
+function expandBounds(b,f){
+  const minX=b[0][0],minY=b[0][1],maxX=b[1][0],maxY=b[1][1];
+  const dx=(maxX-minX)*f,dy=(maxY-minY)*f;
+  return [[minX-dx,minY-dy],[maxX+dx,maxY+dy]];
+}
+function clamp(n,min,max){return Math.min(max,Math.max(min,n));}
+
+document.addEventListener("DOMContentLoaded", init);
+
+async function init(){
+  const status=document.getElementById("status");
+  const mapwrap=document.getElementById("mapwrap");
+  const shadowCanvas=document.getElementById("shadowCanvas");
+  const municipis=await fetch("municipis_icgc_simplificat.json").then(r=>r.json());
+
+  municipis.features = municipis.features.map((f,i)=>{
+    if(f.properties && f.properties.CODIMUNI != null) f.id = f.properties.CODIMUNI;
+    if(!f.properties) f.properties = {};
+    if(i < 18) f.properties.demo_state = "marked";
+    else if(i < 36) f.properties.demo_state = "lived";
+    else f.properties.demo_state = "default";
+    return f;
+  });
+
+  const catBounds=bounds(municipis);
+  const expandedBounds=expandBounds(catBounds,0.003);
+
+  const map=new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{},layers:[]},
+    attributionControl:false,
+    renderWorldCopies:false,
+    dragRotate:false,
+    pitchWithRotate:false,
+    touchPitch:false
+  });
+
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
+
+  let initialCamera=null;
+  let suppress=false;
+  let shadowQueued=false;
+
+  function scheduleShadow(){
+    if(shadowQueued) return;
+    shadowQueued=true;
+    requestAnimationFrame(()=>{
+      shadowQueued=false;
+      drawShadow();
+    });
+  }
+
+  function drawShadow(){
+    const dpr=window.devicePixelRatio || 1;
+    const w=mapwrap.clientWidth;
+    const h=mapwrap.clientHeight;
+    shadowCanvas.width=Math.round(w*dpr);
+    shadowCanvas.height=Math.round(h*dpr);
+    shadowCanvas.style.width=w+"px";
+    shadowCanvas.style.height=h+"px";
+
+    const ctx=shadowCanvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+
+    ctx.save();
+    ctx.translate(7,9);
+    ctx.filter="blur(4px)";
+    ctx.fillStyle="rgba(0,0,0,0.32)";
+    ctx.beginPath();
+
+    function drawPolygonRings(rings){
+      rings.forEach(ring=>{
+        ring.forEach((pt,i)=>{
+          const p=map.project([pt[0],pt[1]]);
+          if(i===0) ctx.moveTo(p.x,p.y);
+          else ctx.lineTo(p.x,p.y);
+        });
+        ctx.closePath();
+      });
+    }
+
+    municipis.features.forEach(f=>{
+      const g=f.geometry;
+      if(!g) return;
+      if(g.type==="Polygon") drawPolygonRings(g.coordinates);
+      else if(g.type==="MultiPolygon") g.coordinates.forEach(drawPolygonRings);
+    });
+
+    ctx.fill("evenodd");
+    ctx.restore();
+  }
+
+  function centerMap(){
+    if(!initialCamera) return;
+    suppress=true;
+    map.jumpTo(initialCamera);
+    scheduleShadow();
+    setTimeout(()=>suppress=false,0);
+  }
+
+  map.on("load",()=>{
+    map.addSource("municipis",{type:"geojson",data:municipis,promoteId:"id"});
+
+    map.addLayer({
+      id:"municipis-fill",
+      type:"fill",
+      source:"municipis",
+      paint:{
+        "fill-color":[
+          "match",
+          ["get","demo_state"],
+          "lived","#2563EB",
+          "marked","#1ECAD3",
+          "#F3F1EC"
+        ]
+      }
+    });
+
+    map.addLayer({
+      id:"municipis-line",
+      type:"line",
+      source:"municipis",
+      paint:{
+        "line-color":"#CFCBC3",
+        "line-width":["interpolate",["linear"],["zoom"],6,0.25,8,0.55,10,0.9]
+      }
+    });
+
+    map.resize();
+    initialCamera = map.cameraForBounds(catBounds,{padding:{top:26,right:18,bottom:62,left:18}});
+    initialCamera.bearing=0;
+    initialCamera.pitch=0;
+    map.jumpTo(initialCamera);
+
+    map.setMinZoom(6.1);
+    map.setMaxZoom(10.5);
+
+    scheduleShadow();
+    status.style.display="none";
+  });
+
+  map.on("move",scheduleShadow);
+  map.on("zoom",scheduleShadow);
+  window.addEventListener("resize",scheduleShadow);
+
+  map.on("moveend",()=>{
+    if(suppress || !initialCamera) return;
+    const c=map.getCenter();
+    const minLng=expandedBounds[0][0], minLat=expandedBounds[0][1], maxLng=expandedBounds[1][0], maxLat=expandedBounds[1][1];
+    const lng=clamp(c.lng,minLng,maxLng), lat=clamp(c.lat,minLat,maxLat);
+    if(lng!==c.lng || lat!==c.lat){
+      suppress=true;
+      map.easeTo({center:[lng,lat],zoom:map.getZoom(),duration:200,essential:true});
+      setTimeout(()=>suppress=false,220);
+    }
+  });
+
+  document.getElementById("center").addEventListener("click",centerMap);
+}
+</script>
+</body>
+</html>
