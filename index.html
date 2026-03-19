@@ -1,0 +1,140 @@
+
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mappiter – targeta compacta v1</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+html,body{margin:0;height:100%;font-family:system-ui,Arial;background:#08262B;overflow:hidden}
+#mapwrap{position:fixed;inset:0;background:radial-gradient(circle at 50% 43%,#1C6D76 0%,#15565F 25%,#0F3F46 45%,#0C3238 70%,#08262B 100%)}
+#map{position:absolute;inset:0}
+
+#municipi-card{
+position:fixed;
+z-index:50;
+min-width:240px;
+max-width:280px;
+background:rgba(8,38,43,.96);
+color:#F3F1EC;
+border-radius:18px;
+padding:14px;
+box-shadow:0 12px 24px rgba(0,0,0,.35);
+transform:translate(-50%,0) scale(.96);
+opacity:0;
+transition:all .18s ease;
+pointer-events:none;
+}
+
+#municipi-card.open{
+opacity:1;
+transform:translate(-50%,0) scale(1);
+pointer-events:auto;
+}
+
+.title{
+font-family:Georgia,serif;
+font-size:28px;
+margin:0 0 4px 0;
+}
+
+.meta{
+font-size:15px;
+color:#C7D7DB;
+margin-bottom:10px;
+}
+
+.summary{
+font-size:14px;
+border-top:1px solid rgba(255,255,255,.08);
+padding-top:8px;
+margin-bottom:10px;
+}
+
+.actions{
+display:grid;
+grid-template-columns:1fr auto auto;
+gap:8px;
+}
+
+.primary{
+border:none;
+border-radius:999px;
+background:#2EC4CE;
+color:white;
+padding:10px 14px;
+font-weight:700;
+}
+
+.iconbtn{
+border:none;
+border-radius:999px;
+width:38px;
+height:38px;
+background:rgba(255,255,255,.08);
+color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div id="mapwrap">
+<div id="map"></div>
+</div>
+
+<div id="municipi-card">
+<div class="title" id="title">Municipi</div>
+<div class="meta" id="meta">Comarca · Província</div>
+<div class="summary" id="summary">0 vivències</div>
+<div class="actions">
+<button class="primary">Afegir vivència</button>
+<button class="iconbtn">…</button>
+<button class="iconbtn">⌄</button>
+</div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+<script>
+
+const map = new maplibregl.Map({
+container:'map',
+style:{version:8,sources:{},layers:[]},
+center:[1.5,41.7],
+zoom:7
+});
+
+const card = document.getElementById("municipi-card");
+
+map.on("click", e => {
+
+const left = e.point.x;
+const top = e.point.y + 20;
+
+card.style.left = left + "px";
+card.style.top = top + "px";
+
+document.getElementById("title").textContent="Municipi";
+document.getElementById("meta").textContent="Comarca · Província";
+document.getElementById("summary").textContent="3 vivències · 1 fita";
+
+card.classList.add("open");
+
+});
+
+map.on("click", e=>{
+
+const features = map.queryRenderedFeatures(e.point);
+
+if(!features.length){
+card.classList.remove("open");
+}
+
+});
+
+</script>
+
+</body>
+</html>
