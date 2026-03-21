@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mappiter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08262B">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#08262B;overflow:hidden}
+#mapwrap{position:fixed;inset:0;background:radial-gradient(circle at 50% 43%, #1C6D76 0%, #15565F 25%, #0F3F46 45%, #0C3238 70%, #08262B 100%)}
+#logoWrap{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:30;pointer-events:none}
+#logoWrap img{height:42px;width:auto;display:block;filter:brightness(1.08) saturate(.2) contrast(1.02) drop-shadow(0 2px 8px rgba(0,0,0,.10))}
+#map{position:absolute;inset:0;z-index:1}
+#center{position:fixed;right:16px;bottom:100px;width:48px;height:48px;border-radius:50%;border:none;background:rgba(242,245,247,.96);color:#38515d;box-shadow:0 4px 10px rgba(0,0,0,.14);z-index:20;font:inherit}
+#status{position:fixed;left:12px;top:64px;background:rgba(8,38,43,.9);color:#F3F1EC;border:1px solid rgba(243,241,236,.14);border-radius:12px;padding:8px 10px;z-index:30;font-weight:700}
+#municipi-card{position:fixed;z-index:40;min-width:246px;max-width:286px;background:linear-gradient(180deg, rgba(12,50,56,.96) 0%, rgba(8,38,43,.98) 100%);color:#F3F1EC;border:1px solid rgba(243,241,236,.07);border-radius:18px;padding:12px 14px 12px;box-shadow:0 10px 22px rgba(0,0,0,.24);transform:translate(-50%, 8px) scale(.985);opacity:0;pointer-events:none;transition:transform 170ms ease, opacity 170ms ease}
+#municipi-card.open{opacity:1;pointer-events:auto;transform:translate(-50%, 0) scale(1)}
+#municipi-card .card-top{display:flex;justify-content:space-between;align-items:start;gap:8px}
+#municipi-card .title{font-size:23px;line-height:1.08;font-weight:700;letter-spacing:-.015em;margin:0 0 4px 0;color:#F4F2EC}
+#municipi-card .meta{font-size:15px;line-height:1.2;color:#C9D9DD;margin:0 0 10px 0}
+#municipi-card .summary{font-size:15px;line-height:1.3;color:#E7EFF1;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);margin:0 0 12px 0}
+#municipi-card .actions{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+#municipi-card .primary{height:40px;border:none;border-radius:999px;padding:0 14px;background:#2aaab3;color:#F9FEFF;font-weight:700;box-shadow:none;font:inherit}
+#municipi-card .iconbtn{width:40px;height:40px;border:none;border-radius:999px;background:rgba(243,241,236,.08);color:#F3F1EC;box-shadow:inset 0 0 0 1px rgba(243,241,236,.08);font-size:19px;font-weight:700;font:inherit}
+#municipi-card .expand{font-size:22px;line-height:1;transform:translateY(-1px)}
+#municipi-card .closebtn{width:30px;height:30px;border:none;border-radius:999px;background:rgba(243,241,236,.06);color:#DCE7E9;font-size:16px;line-height:1;font-weight:700}
+.extra{display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.extra.open{display:block}
+.extra button{width:100%;height:42px;border:none;border-radius:10px;background:rgba(243,241,236,.08);color:#F3F1EC;text-align:left;padding:0 12px;margin-bottom:6px;font:inherit}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);background:rgba(8,38,43,.96);color:#F3F1EC;border:1px solid rgba(243,241,236,.10);border-radius:999px;padding:10px 14px;opacity:0;pointer-events:none;z-index:50;transition:opacity 160ms ease, transform 160ms ease;font-size:14px}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-right,.maplibregl-ctrl-top-left{display:none!important}
+</style>
+</head>
+<body>
+<div id="logoWrap"><img src="logo_mappiter_verd_sensefons.png" alt="Mappiter"></div>
+<div id="mapwrap"><div id="map"></div></div>
+<div id="status">Carregant mapa…</div>
+<button id="center" aria-label="Centrar Catalunya">⌖</button>
+<div id="municipi-card" aria-live="polite">
+  <div class="card-top">
+    <div>
+      <div class="title" id="card-title">Begur</div>
+      <div class="meta" id="card-meta">Baix Empordà · Girona</div>
+    </div>
+    <button class="closebtn" id="btn-close" aria-label="Tancar">×</button>
+  </div>
+  <div class="summary" id="card-summary">3 vivències · 1 fita · 1 ruta</div>
+  <div class="actions">
+    <button class="primary" id="btn-add">Afegir vivència</button>
+    <button class="iconbtn" id="btn-more" aria-label="Més accions">…</button>
+    <button class="iconbtn expand" id="btn-expand" aria-label="Expandir">⌄</button>
+  </div>
+  <div id="card-extra" class="extra">
+    <button id="extra-view">Veure municipi</button>
+    <button id="extra-fita">Afegir fita</button>
+    <button id="extra-ruta">Afegir ruta</button>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+function bounds(fc){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}fc.features.forEach(f=>scan(f.geometry.coordinates));return [[minX,minY],[maxX,maxY]]}
+function expandBounds(b,f){const minX=b[0][0],minY=b[0][1],maxX=b[1][0],maxY=b[1][1];const dx=(maxX-minX)*f,dy=(maxY-minY)*f;return [[minX-dx,minY-dy],[maxX+dx,maxY+dy]]}
+function clamp(n,min,max){return Math.min(max,Math.max(min,n))}
+function demoState(i,total){const multiple=Math.floor(total*0.10), lived=Math.floor(total*0.25), marked=Math.floor(total*0.50);if(i<multiple)return"lived_multiple";if(i<lived)return"lived";if(i<marked)return"marked";return"default"}
+function featureBounds(geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}scan(geometry.coordinates);return [[minX,minY],[maxX,maxY]]}
+function featureCenter(geometry){const b=featureBounds(geometry);return [(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2]}
+function projectGeomBounds(map, geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){const p=map.project([c[0],c[1]]);minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}else{c.forEach(scan)}}scan(geometry.coordinates);return {minX,minY,maxX,maxY,width:maxX-minX,height:maxY-minY}}
+function summaryFromFeature(feature){const code=String((feature.properties&&feature.properties.CODIMUNI)||feature.id||"0").replace(/\D/g,"");const n=parseInt(code||"0",10);const viv=(n%4)+1, fita=(n%3===0)?1:0, ruta=(n%4===0)?1:0;const parts=[viv+" vivènci"+(viv===1?"a":"es")];if(fita)parts.push(fita+" fita");if(ruta)parts.push(ruta+" ruta");return parts.join(" · ")}
+document.addEventListener("DOMContentLoaded",init);
+async function init(){
+const status=document.getElementById("status");
+const municipis=await fetch("municipis_icgc_simplificat.json").then(r=>r.json());
+const total=municipis.features.length;
+municipis.features=municipis.features.map((f,i)=>{if(!f.properties)f.properties={};f.properties.demo_state=demoState(i,total);if(f.properties&&f.properties.CODIMUNI!=null)f.id=f.properties.CODIMUNI;if(!f.id)f.id=i+1;return f});
+const catBounds=bounds(municipis);
+const expandedBounds=expandBounds(catBounds,0.0015);
+const map=new maplibregl.Map({container:"map",style:{version:8,sources:{},layers:[]},attributionControl:false,renderWorldCopies:false,dragRotate:false,pitchWithRotate:false,touchPitch:false});
+map.dragRotate.disable();map.touchZoomRotate.disableRotation();
+const card=document.getElementById("municipi-card");
+const extra=document.getElementById("card-extra");
+const toast=document.getElementById("toast");
+let initialCamera=null,suppress=false,selectedFeature=null,cardOpen=false,dragStartPoint=null,focusCenter=null,focusRecentering=false,ignoreUntil=0;
+function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(showToast._t);showToast._t=setTimeout(()=>toast.classList.remove("show"),1500)}
+function closeCard(){card.classList.remove("open");extra.classList.remove("open");cardOpen=false;selectedFeature=null;focusCenter=null;const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[]});ignoreUntil=Date.now()+250}
+function centerMap(){if(!initialCamera)return;suppress=true;closeCard();map.jumpTo(initialCamera);setTimeout(()=>suppress=false,0)}
+function updateCardContent(feature){const p=feature.properties||{};document.getElementById("card-title").textContent=p.NOMMUNI||"Municipi";document.getElementById("card-meta").textContent=(p.NOMCOMAR||"Comarca")+" · "+(p.NOMPROV||"Província");document.getElementById("card-summary").textContent=summaryFromFeature(feature)}
+function placeCard(){if(!selectedFeature)return;const box=projectGeomBounds(map, selectedFeature.geometry);const center=map.project(featureCenter(selectedFeature.geometry));const rect=card.getBoundingClientRect();const margin=16;let left=center.x;let top=box.maxY+130;const half=rect.width/2;if(left-half<margin)left=margin+half;if(left+half>window.innerWidth-margin)left=window.innerWidth-margin-half;if(top+rect.height>window.innerHeight-18){top=Math.max(margin,box.minY-rect.height-130)}card.style.left=left+"px";card.style.top=top+"px"}
+function targetZoomForFeature(){const minZoom=8.15,maxZoom=8.45,current=map.getZoom();if(current<minZoom)return 8.25;if(current>maxZoom)return current;return current}
+function selectFeature(feature){selectedFeature=feature;focusCenter=featureCenter(feature.geometry);updateCardContent(feature);const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[feature]});map.easeTo({center:focusCenter,zoom:targetZoomForFeature(feature),offset:[0,-145],duration:220,essential:true});setTimeout(()=>{card.classList.add("open");cardOpen=true;placeCard()},230)}
+map.on("load",()=>{
+map.addSource("municipis",{type:"geojson",data:municipis,promoteId:"id"});
+map.addSource("selected-municipi",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+map.addLayer({id:"municipis-fill",type:"fill",source:"municipis",paint:{"fill-color":["match",["get","demo_state"],"marked","#2EC4CE","lived","#0B4F8A","lived_multiple","#062E57","#F3F1EC"]}});
+map.addLayer({id:"municipis-dim",type:"fill",source:"municipis",paint:{"fill-color":"#08262B","fill-opacity":["case",["==",["get","demo_state"],"default"],0,0.18]}});
+map.addLayer({id:"selected-fill",type:"fill",source:"selected-municipi",paint:{"fill-color":["match",["get","demo_state"],"marked","#69e0e7","lived","#2d72ab","lived_multiple","#1a4b7a","#f6efe0"],"fill-opacity":0.64}});
+map.addLayer({id:"municipis-line",type:"line",source:"municipis",paint:{"line-color":["match",["get","demo_state"],"marked","#D8EEF2","lived","#CFE6FF","lived_multiple","#E6F1FF","#9FA6A0"],"line-width":["interpolate",["linear"],["zoom"],6,0.6,8,0.9,10,1.2]}});
+map.addLayer({id:"selected-halo",type:"line",source:"selected-municipi",paint:{"line-color":"rgba(255,255,255,0.35)","line-width":["interpolate",["linear"],["zoom"],6,8,8,10,10,12],"line-blur":2.5}});
+map.addLayer({id:"selected-line-outer",type:"line",source:"selected-municipi",paint:{"line-color":"#FFFFFF","line-width":["interpolate",["linear"],["zoom"],6,5.2,8,6.0,10,7.0]}});
+map.addLayer({id:"selected-line",type:"line",source:"selected-municipi",paint:{"line-color":"#2EC4CE","line-width":["interpolate",["linear"],["zoom"],6,2.2,8,2.8,10,3.4]}});
+map.resize();initialCamera=map.cameraForBounds(catBounds,{padding:{top:28,right:18,bottom:64,left:18}});initialCamera.bearing=0;initialCamera.pitch=0;map.jumpTo(initialCamera);map.setMinZoom(6.1);map.setMaxZoom(10.5);status.style.display="none";
+});
+map.on("click","municipis-fill",function(e){if(Date.now()<ignoreUntil)return;const feature=e.features&&e.features[0];if(!feature)return;if(cardOpen){closeCard();return;}selectFeature(feature)});
+map.on("mouseenter","municipis-fill",function(){map.getCanvas().style.cursor="pointer"});
+map.on("mouseleave","municipis-fill",function(){map.getCanvas().style.cursor=""});
+map.on("click",function(e){if(Date.now()<ignoreUntil)return;const feats=map.queryRenderedFeatures(e.point,{layers:["municipis-fill"]});if(cardOpen){if(!card.contains(e.originalEvent.target)){closeCard();}}else if(!feats.length){closeCard()}});
+map.on("dragstart",function(e){if(cardOpen)dragStartPoint=e.point});
+map.on("move",function(){if(cardOpen&&focusCenter&&!focusRecentering){const current=map.getCenter();const dx=current.lng-focusCenter[0];const dy=current.lat-focusCenter[1];const maxOffset=0.06;if(Math.abs(dx)>maxOffset||Math.abs(dy)>maxOffset){focusRecentering=true;map.easeTo({center:focusCenter,offset:[0,-145],duration:120,essential:true});setTimeout(function(){focusRecentering=false},140)}}});
+map.on("dragend",function(e){if(!cardOpen||!dragStartPoint)return;const dx=e.point.x-dragStartPoint.x, dy=e.point.y-dragStartPoint.y;const dist=Math.sqrt(dx*dx+dy*dy);dragStartPoint=null;if(dist>48){closeCard()}});
+map.on("moveend",function(){if(suppress||!initialCamera)return;const c=map.getCenter();const minLng=expandedBounds[0][0],minLat=expandedBounds[0][1],maxLng=expandedBounds[1][0],maxLat=expandedBounds[1][1];const lng=clamp(c.lng,minLng,maxLng), lat=clamp(c.lat,minLat,maxLat);if(lng!==c.lng||lat!==c.lat){suppress=true;map.easeTo({center:[lng,lat],zoom:map.getZoom(),duration:200,essential:true});setTimeout(function(){suppress=false},220)}});
+document.getElementById("center").addEventListener("click",centerMap);
+document.getElementById("btn-close").addEventListener("click",function(ev){ev.stopPropagation();closeCard()});
+document.getElementById("btn-add").addEventListener("click",function(ev){ev.stopPropagation();showToast("Afegir vivència")});
+document.getElementById("btn-more").addEventListener("click",function(ev){ev.stopPropagation();extra.classList.toggle("open");setTimeout(placeCard,10)});
+document.getElementById("btn-expand").addEventListener("click",function(ev){ev.stopPropagation();showToast("Targeta expandida · propera fase")});
+document.getElementById("extra-view").addEventListener("click",function(ev){ev.stopPropagation();showToast("Veure municipi")});
+document.getElementById("extra-fita").addEventListener("click",function(ev){ev.stopPropagation();showToast("Afegir fita")});
+document.getElementById("extra-ruta").addEventListener("click",function(ev){ev.stopPropagation();showToast("Afegir ruta")});
+card.addEventListener("click",function(ev){ev.stopPropagation()});
+}
+</script>
+</body>
+</html>
