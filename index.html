@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mappiter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08262B">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#08262B;overflow:hidden}
+#mapwrap{position:fixed;inset:0;background:radial-gradient(circle at 50% 43%, #1C6D76 0%, #15565F 25%, #0F3F46 45%, #0C3238 70%, #08262B 100%)}
+#topbar{position:fixed;top:10px;left:12px;right:12px;height:56px;z-index:35;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:0 10px;border-radius:18px;background:#FFFFFF;backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.topbtn{height:40px;width:40px;min-width:40px;border:none;border-radius:12px;background:transparent;color:#17333a;font:inherit;font-weight:700;padding:0;display:grid;place-items:center;font-size:20px}
+#topbar-logo{justify-self:center;height:34px;width:auto;display:block;filter:none}
+#topbar-list{justify-self:end;display:flex;gap:6px}
+.icon-svg{width:22px;height:22px;display:block}
+.icon-svg path,.icon-svg line,.icon-svg rect{stroke:currentColor;fill:none;stroke-width:2.0;stroke-linecap:round;stroke-linejoin:round}
+.icon-svg circle{fill:currentColor;stroke:none}
+#map{position:absolute;inset:0;z-index:1}
+#map-empty{position:fixed;left:50%;top:78px;transform:translateX(-50%);z-index:26;display:none;max-width:min(92vw,420px);background:rgba(255,255,255,.96);color:#395057;border:1px solid rgba(23,51,58,.10);border-radius:14px;padding:10px 14px;box-shadow:0 8px 20px rgba(0,0,0,.10);font-size:14px;line-height:1.35;text-align:center}
+#map-empty.show{display:block}
+#center{position:fixed;right:16px;bottom:16px;width:48px;height:48px;border-radius:50%;border:none;background:rgba(242,245,247,.96);color:#38515d;box-shadow:0 4px 10px rgba(0,0,0,.14);z-index:20;font:inherit}
+#status{position:fixed;left:12px;top:64px;background:rgba(8,38,43,.9);color:#F3F1EC;border:1px solid rgba(243,241,236,.14);border-radius:12px;padding:8px 10px;z-index:30;font-weight:700}
+#municipi-card{position:fixed;z-index:40;min-width:262px;max-width:340px;max-height:min(72vh,560px);display:flex;flex-direction:column;background:linear-gradient(180deg, rgba(12,50,56,.96) 0%, rgba(8,38,43,.98) 100%);color:#F3F1EC;border:1px solid rgba(243,241,236,.07);border-radius:18px;padding:12px 14px 12px;box-shadow:0 10px 22px rgba(0,0,0,.24);transform:translate(-50%, 8px) scale(.985);opacity:0;pointer-events:none;transition:transform 170ms ease, opacity 170ms ease;overflow:hidden}
+#municipi-card.open{opacity:1;pointer-events:auto;transform:translate(-50%, 0) scale(1)}
+#municipi-card .card-top{display:flex;justify-content:space-between;align-items:start;gap:8px;flex:0 0 auto}
+#municipi-card .title{font-size:24px;line-height:1.08;font-weight:700;letter-spacing:-.015em;margin:0 0 4px 0;color:#F4F2EC}
+#municipi-card .meta{font-size:15px;line-height:1.25;color:#D0DEE1;margin:0 0 10px 0}
+#municipi-card .card-divider{height:1px;background:rgba(255,255,255,.08);margin:0 0 10px 0}
+#municipi-card .summary{font-size:15px;line-height:1.35;color:#EDF4F5;margin:0 0 12px 0}
+#municipi-card .actions{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+#municipi-card .primary{height:42px;border:none;border-radius:999px;padding:0 14px;background:#2aaab3;color:#F9FEFF;font-weight:700;box-shadow:none;font:inherit}
+#municipi-card .iconbtn{width:40px;height:40px;border:none;border-radius:999px;background:rgba(243,241,236,.08);color:#F3F1EC;box-shadow:inset 0 0 0 1px rgba(243,241,236,.08);font-size:19px;font-weight:700;font:inherit}
+#municipi-card .closebtn{width:30px;height:30px;border:none;border-radius:999px;background:rgba(243,241,236,.06);color:#DCE7E9;font-size:16px;line-height:1;font-weight:700}
+#municipi-card .card-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+
+.extra{display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;grid-template-columns:1fr 1fr;gap:8px}
+.extra.open{display:grid;overflow:visible}
+.extra button{width:100%;height:42px;border:none;border-radius:12px;background:rgba(243,241,236,.10);color:#F3F1EC;text-align:left;padding:0 10px;margin:0;font:inherit;font-weight:600}.extra button.full{grid-column:1 / -1}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);background:rgba(8,38,43,.96);color:#F3F1EC;border:1px solid rgba(243,241,236,.10);border-radius:999px;padding:10px 14px;opacity:0;pointer-events:none;z-index:50;transition:opacity 160ms ease, transform 160ms ease;font-size:14px}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:60}
+#confirm-overlay.open{display:block}
+#confirm-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,calc(100vw - 32px));background:rgba(8,38,43,.98);color:#F3F1EC;border:1px solid rgba(243,241,236,.08);border-radius:18px;padding:16px;box-shadow:0 18px 36px rgba(0,0,0,.35)}
+#confirm-dialog h3{margin:0 0 8px 0;font-size:18px}
+#confirm-dialog p{margin:0 0 14px 0;color:#D0DEE1;line-height:1.35}
+#confirm-dialog button{width:100%;height:44px;border:none;border-radius:12px;margin-top:8px;font:inherit}
+#confirm-dialog .danger{background:#b84c4c;color:white}
+#confirm-dialog .soft{background:rgba(243,241,236,.10);color:#F3F1EC}
+#confirm-dialog .cancel{background:transparent;color:#D0DEE1;border:1px solid rgba(243,241,236,.10)}
+
+#municipis-list-screen{position:fixed;inset:0;z-index:45;background:#F7F7F4;color:#17333a;display:none;flex-direction:column}
+#municipis-list-screen.open{display:flex}
+#municipis-list-header{display:flex;align-items:center;gap:10px;padding:10px 12px 8px;background:#FFFFFF;border-bottom:1px solid rgba(23,51,58,.08);min-height:56px;box-sizing:border-box;position:relative;z-index:2;flex:0 0 auto}
+#municipis-list-back{width:40px;height:40px;border:none;border-radius:12px;background:rgba(8,38,43,.06);color:#17333a;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 40px}
+#municipis-list-back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+#municipis-list-title{font-size:18px;font-weight:700;line-height:1.2}
+#municipis-list-tools{padding:10px 12px 8px;background:#FFFFFF;border-bottom:1px solid rgba(23,51,58,.08);position:relative;z-index:3;flex:0 0 auto}
+.municipis-search-row{display:flex;align-items:center;gap:8px}
+#municipis-search{width:100%;height:42px;border:1px solid rgba(23,51,58,.12);border-radius:12px;background:#F7F7F4;color:#17333a;padding:0 14px;box-sizing:border-box;font:inherit;font-size:15px;outline:none;flex:1 1 auto;min-width:0}
+#municipis-search:focus{border-color:rgba(23,51,58,.28)}
+#municipis-search-filters{width:42px;height:42px;border:none;border-radius:12px;background:#EEF1EF;color:#17333a;display:flex;align-items:center;justify-content:center;flex:0 0 42px;position:relative}
+#municipis-search-filters.filter-active{background:#17333a;color:#FFFFFF}
+#municipis-search-filters.filter-active::after{content:"";position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#1ECAD3}
+#municipis-search-filters svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#municipis-search-cancel{display:none;height:42px;border:none;background:transparent;color:#17333a;font:inherit;font-size:15px;font-weight:600;padding:0 4px;flex:0 0 auto}
+#municipis-list-screen.search-mode #municipis-list-header{display:none}
+#municipis-list-screen.search-mode #municipis-search-cancel{display:block}
+#municipis-list{flex:1 1 auto;overflow:auto;background:#F7F7F4;-webkit-overflow-scrolling:touch}
+.municipi-list-row{width:100%;border:none;border-bottom:1px solid rgba(23,51,58,.08);background:transparent;padding:11px 12px;text-align:left;color:inherit;font:inherit;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.municipi-list-row:active{background:rgba(23,51,58,.05)}
+.municipi-list-row,.municipi-list-row *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.municipi-list-main{min-width:0;display:grid;grid-template-columns:10px minmax(0,1fr);column-gap:8px;align-items:center}
+.municipi-list-name{font-size:15px;font-weight:700;line-height:1.2;color:#17333a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.municipi-list-meta{font-size:13px;line-height:1.2;color:#5F7278;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.municipi-list-marker{width:10px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;align-self:center;height:100%}
+.municipi-list-marker-dot{width:7px;height:7px;border-radius:50%;background:#1ECAD3;opacity:.65;display:block}
+.municipi-list-side{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;flex:0 0 auto}
+.municipi-list-counts{font-size:12px;line-height:1.25;color:#17333a;font-weight:700;text-align:right;max-width:170px}
+#municipis-empty{display:none;padding:18px 12px;color:#5F7278;font-size:14px}
+#municipis-empty.show{display:block}
+#municipis-count{padding:8px 12px 10px;color:#5F7278;font-size:14px;font-weight:600;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-count[hidden]{display:none}
+#municipis-bulk-entry{padding:0 12px 10px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-bulk-entry[hidden]{display:none}
+#municipis-bulk-trigger{width:100%;min-height:42px;border:none;border-radius:12px;background:#EEF1EF;color:#17333a;font:inherit;font-size:14px;font-weight:700;padding:0 14px;text-align:center}
+#municipis-selection-tip{padding:10px 12px 0;color:#5F7278;font-size:13px;line-height:1.35}
+.municipis-selection-tip-sub{display:block;margin-top:3px}
+#municipis-selection-tip[hidden]{display:none}
+#municipis-list-screen.selection-mode #municipis-bulk-entry{display:none}
+#municipis-list-screen.selection-mode #municipis-selection-tip{display:none}
+#municipis-list-screen.selection-mode .municipis-search-row{opacity:.55}
+#municipis-list-screen.selection-mode .municipis-search-row input,
+#municipis-list-screen.selection-mode .municipis-search-row button{pointer-events:none}
+.municipi-list-row.is-selected{background:rgba(30,202,211,.12)}
+.municipi-list-row.is-selected .municipi-list-name{color:#0E4A54}
+.municipi-list-row.is-selected .municipi-list-side{color:#0E4A54}
+.municipi-list-select-indicator{display:none;min-width:20px;height:20px;border-radius:999px;align-items:center;justify-content:center;font-size:12px;line-height:1;font-weight:800;background:#17333a;color:#FFFFFF}
+.municipi-list-row.is-selected .municipi-list-select-indicator{display:flex}
+#municipis-selection-bar{position:fixed;left:12px;right:12px;bottom:12px;z-index:49;background:#FFFFFF;border:1px solid rgba(23,51,58,.08);border-radius:18px;box-shadow:0 12px 28px rgba(0,0,0,.16);padding:12px;display:none}
+#municipis-selection-bar.show{display:block}
+#municipis-selection-title{font-size:15px;font-weight:700;color:#17333a;margin-bottom:6px}
+#municipis-selection-help{font-size:13px;line-height:1.3;color:#5F7278;margin-bottom:10px}
+#municipis-selection-actions{display:flex;gap:8px}
+#municipis-selection-confirm,#municipis-selection-cancel{height:44px;border:none;border-radius:12px;font:inherit}
+#municipis-selection-confirm{flex:1 1 auto;background:#17333a;color:#FFFFFF;font-weight:700}
+#municipis-selection-cancel{flex:0 0 auto;background:#EEF1EF;color:#17333a;padding:0 14px;font-weight:600}
+#municipis-list-screen.selection-mode #municipis-list{padding-bottom:150px}
+
+#filters-sheet{position:fixed;left:0;right:0;bottom:0;z-index:48;display:none;pointer-events:none}
+#filters-sheet.open{display:block}
+#filters-sheet .sheet{width:min(100vw,560px);margin:0 auto;background:#FFFFFF;border-radius:22px 22px 0 0;box-shadow:0 -10px 26px rgba(0,0,0,.18);pointer-events:auto;transform:translateY(calc(100% - 114px));transition:transform 180ms ease}
+#filters-sheet.expanded .sheet{transform:translateY(0)}
+#filters-sheet.hidden-sheet{display:none}
+#filters-sheet-handle{display:flex;justify-content:center;padding:10px 0 6px;cursor:pointer;touch-action:none}
+#filters-sheet-handle::before{content:"";width:42px;height:5px;border-radius:999px;background:#CBD5D8}
+#filters-sheet-content{padding:0 16px 16px;max-height:min(68vh,620px);overflow:auto}
+#filters-sheet-collapsed{padding:0 16px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
+#filters-sheet.expanded #filters-sheet-collapsed{display:none}
+#filters-sheet:not(.expanded) #filters-sheet-content{display:none}
+.filters-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.filters-sheet-title{font-size:20px;font-weight:700;color:#17333a}
+.filters-sheet-head-actions{display:flex;align-items:center;gap:8px}
+#filters-clear{border:none;background:transparent;color:#17333a;font:inherit;font-weight:600;padding:8px 6px;display:none}
+#filters-clear.show{display:block}
+#filters-close{width:36px;height:36px;border:none;border-radius:999px;background:#EEF1EF;color:#17333a;font-size:18px;line-height:1}
+.filter-block{margin-top:14px}
+.filter-block-title{font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5F7278;margin-bottom:10px}
+.filter-state-grid{display:flex;flex-wrap:wrap;gap:8px}
+.filter-state-chip{height:34px;border:none;border-radius:999px;background:#EEF1EF;color:#395057;padding:0 12px;font:inherit;font-size:14px;font-weight:600;transition:background-color 140ms ease,color 140ms ease, box-shadow 140ms ease, border-color 140ms ease}
+.filter-state-chip.active{background:#17333a;color:#FFFFFF}
+#filter-state-grid .filter-state-chip{position:relative;padding:0 14px 0 38px;box-shadow:inset 0 0 0 1px rgba(23,51,58,.10)}
+#filter-state-grid .filter-state-chip::before{content:"";position:absolute;left:14px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(57,80,87,.42);background:#FFFFFF}
+#filter-state-grid .filter-state-chip.active{box-shadow:inset 0 0 0 2px rgba(23,51,58,.96);background:#E9F1F2;color:#17333a}
+#filter-state-grid .filter-state-chip.active::before{box-shadow:inset 0 0 0 4px #17333a;background:#FFFFFF}
+.filter-select{border:1px solid rgba(23,51,58,.12);border-radius:14px;background:#F7F7F4;margin-bottom:10px;overflow:hidden}
+.filter-select summary{list-style:none;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-weight:600;color:#17333a}
+.filter-select summary::-webkit-details-marker{display:none}
+.filter-select summary::after{content:"⌄";font-size:16px;color:#5F7278}
+.filter-select[open] summary::after{content:"⌃"}
+.filter-select-panel{max-height:190px;overflow:auto;padding:0 14px 12px;border-top:1px solid rgba(23,51,58,.08)}
+.filter-check{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:14px;color:#17333a}
+.filter-check + .filter-check{border-top:1px solid rgba(23,51,58,.06)}
+.filter-check input{width:16px;height:16px}
+.filter-placeholder{border:1px dashed rgba(23,51,58,.14);border-radius:14px;padding:12px 14px;color:#7B8A8F;font-size:14px;background:#FBFBF9}
+.filters-sheet-footer{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.filters-sheet-footer button,#filters-sheet-switch-view{height:44px;border:none;border-radius:999px;font:inherit;font-weight:700;padding:0 16px}
+#filters-apply-map{background:#17333a;color:#FFFFFF}
+#filters-apply-list{background:#2AAAB3;color:#FFFFFF}
+#filters-sheet-summary{font-size:14px;line-height:1.25;color:#395057;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+#filters-sheet-switch-view{background:#17333a;color:#FFFFFF;min-width:138px;justify-self:start}
+
+
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-right,.maplibregl-ctrl-top-left{display:none!important}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <button class="topbtn" id="btn-menu" aria-label="Menú">
+    <svg class="icon-svg" viewBox="0 0 24 24">
+      <circle cx="12" cy="5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="12" cy="19" r="2.4" fill="currentColor" stroke="none"></circle>
+    </svg>
+  </button>
+  <img id="topbar-logo" src="logo_mappiter_verd_sensefons.png" alt="Mappiter">
+  <div id="topbar-list">
+  <button class="topbtn" id="list-icon">
+    <svg class="icon-svg" viewBox="0 0 24 24">
+      <circle cx="5" cy="4.5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="5" cy="12" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="5" cy="19.5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <line x1="9" y1="4.5" x2="19.5" y2="4.5"></line>
+      <line x1="9" y1="12" x2="19.5" y2="12"></line>
+      <line x1="9" y1="19.5" x2="19.5" y2="19.5"></line>
+    </svg>
+  </button>
+</div>
+</div>
+<div id="mapwrap"><div id="map"></div></div>
+<div id="map-empty">No s'han trobat municipis amb aquests filtres</div>
+<div id="status">Carregant mapa…</div>
+<button id="center" aria-label="Centrar Catalunya">⌖</button>
+<div id="municipi-card" aria-live="polite">
+  <div class="card-top">
+    <div>
+      <div class="title" id="card-title">Begur</div>
+      <div class="meta" id="card-meta">Baix Empordà · Girona</div>
+    </div>
+    <button class="closebtn" id="btn-close" aria-label="Tancar">×</button>
+  </div>
+  <div class="card-body">
+    <div class="card-divider" aria-hidden="true"></div>
+    <div class="summary" id="card-summary" hidden></div>
+    <div class="actions">
+      <button class="primary" id="btn-primary">Marcar municipi</button>
+      <button class="iconbtn" id="btn-more" aria-label="Més accions">…</button>
+    </div>
+    <div id="card-extra" class="extra"></div>
+  </div>
+</div>
+
+<div id="municipis-list-screen" aria-hidden="true">
+  <div id="municipis-list-header">
+    <button id="municipis-list-back" aria-label="Tornar al mapa">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"></path></svg>
+    </button>
+    <div id="municipis-list-title">Municipis</div>
+  </div>
+  <div id="municipis-list-tools">
+    <div class="municipis-search-row">
+      <input id="municipis-search" type="search" inputmode="search" placeholder="Cercar municipi" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+      <button id="municipis-search-filters" type="button" aria-label="Filtres">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></svg>
+      </button>
+      <button id="municipis-search-cancel" type="button" aria-label="Cancel·lar cerca">Cancel·lar</button>
+    </div>
+  </div>
+  <div id="municipis-count" aria-live="polite"></div>
+  <div id="municipis-bulk-entry" hidden>
+    <button id="municipis-bulk-trigger" type="button">Marcar aquests municipis al mapa</button>
+  </div>
+  <div id="municipis-selection-tip">Pots marcar diversos municipis alhora al teu mapa<br><span class="municipis-selection-tip-sub">Toc llarg sobre un municipi per començar</span></div>
+  <div id="municipis-empty">No s'han trobat municipis</div>
+  <div id="municipis-list"></div>
+  <div id="municipis-selection-bar" aria-live="polite">
+    <div id="municipis-selection-title">0 municipis seleccionats</div>
+    <div id="municipis-selection-help">Pots ajustar la selecció abans de marcar</div>
+    <div id="municipis-selection-actions">
+      <button id="municipis-selection-confirm" type="button">Marcar municipis (0)</button>
+      <button id="municipis-selection-cancel" type="button">Cancel·lar</button>
+    </div>
+  </div>
+</div>
+
+<div id="filters-sheet" aria-hidden="true">
+  <div class="sheet">
+    <div id="filters-sheet-handle" aria-label="Alternar filtres"></div>
+    <div id="filters-sheet-content">
+      <div class="filters-sheet-top">
+        <div class="filters-sheet-title">Filtres</div>
+        <div class="filters-sheet-head-actions">
+          <button id="filters-clear" type="button">Esborrar</button>
+          <button id="filters-close" type="button" aria-label="Tancar filtres">×</button>
+        </div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-block-title">Estat del municipi</div>
+        <div class="filter-state-grid" id="filter-state-grid">
+          <button class="filter-state-chip" type="button" data-state="marked">Marcats</button>
+          <button class="filter-state-chip" type="button" data-state="unmarked">No marcats</button>
+        </div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-block-title">Territori</div>
+        <details class="filter-select" id="province-select">
+          <summary id="province-summary">Totes les províncies</summary>
+          <div class="filter-select-panel" id="province-options"></div>
+        </details>
+        <details class="filter-select" id="comarca-select">
+          <summary id="comarca-summary">Totes les comarques</summary>
+          <div class="filter-select-panel" id="comarca-options"></div>
+        </details>
+      </div>
+      <div class="filter-block">
+        <div class="filter-block-title">Contingut registrat</div>
+        <div class="filter-state-grid" id="filter-content-grid">
+          <button class="filter-state-chip" type="button" data-content="viv">Amb vivències</button>
+          <button class="filter-state-chip" type="button" data-content="fita">Amb fites</button>
+          <button class="filter-state-chip" type="button" data-content="ruta">Amb rutes</button>
+        </div>
+        <div class="filter-placeholder" style="margin-top:10px">Categories i persones quedaran preparades en aquesta mateixa targeta.</div>
+      </div>
+      <div class="filters-sheet-footer">
+        <button id="filters-apply-map" type="button">Veure al mapa</button>
+        <button id="filters-apply-list" type="button">Veure a la llista</button>
+      </div>
+    </div>
+    <div id="filters-sheet-collapsed">
+      <div id="filters-sheet-summary"></div>
+      <button id="filters-sheet-switch-view" type="button">Veure a la llista</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="confirm-overlay">
+  <div id="confirm-dialog">
+    <h3 id="confirm-title">Desmarcar municipi</h3>
+    <p id="confirm-text">Aquest municipi té contingut. Què vols fer?</p>
+    <div id="confirm-step-1">
+      <button class="danger" id="confirm-delete-all">Desmarcar i eliminar tot el contingut</button>
+      <button class="soft" id="confirm-keep-fites">Desmarcar mantenint les fites</button>
+      <button class="cancel" id="confirm-cancel">Cancel·lar</button>
+    </div>
+    <div id="confirm-step-2" style="display:none">
+      <button class="danger" id="confirm-final-delete">Eliminar</button>
+      <button class="cancel" id="confirm-final-cancel">Cancel·lar</button>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+function bounds(fc){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}fc.features.forEach(f=>scan(f.geometry.coordinates));return [[minX,minY],[maxX,maxY]]}
+function expandBounds(b,f){const minX=b[0][0],minY=b[0][1],maxX=b[1][0],maxY=b[1][1];const dx=(maxX-minX)*f,dy=(maxY-minY)*f;return [[minX-dx,minY-dy],[maxX+dx,maxY+dy]]}
+function clamp(n,min,max){return Math.min(max,Math.max(min,n))}
+function demoState(i,total){const multiple=Math.floor(total*0.10), lived=Math.floor(total*0.25), marked=Math.floor(total*0.50);if(i<multiple)return"lived_multiple";if(i<lived)return"lived";if(i<marked)return"marked";return"default"}
+function featureBounds(geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}scan(geometry.coordinates);return [[minX,minY],[maxX,maxY]]}
+function featureCenter(geometry){const b=featureBounds(geometry);return [(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2]}
+function projectGeomBounds(map, geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){const p=map.project([c[0],c[1]]);minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}else{c.forEach(scan)}}scan(geometry.coordinates);return {minX,minY,maxX,maxY,width:maxX-minX,height:maxY-minY}}
+function summaryCounts(feature){const p=feature.properties||{};const viv=Number(p.demo_viv??p.viv??p.vivencies??0)||0;const fita=Number(p.demo_fita??p.fita??p.fites??0)||0;const ruta=Number(p.demo_ruta??p.ruta??p.rutes??0)||0;return {viv,fita,ruta}}
+function summaryText(feature){const c=summaryCounts(feature);const parts=[];if(c.viv>0)parts.push(c.viv+" "+(c.viv===1?"vivència":"vivències"));if(c.fita>0)parts.push(c.fita+" "+(c.fita===1?"fita":"fites"));if(c.ruta>0)parts.push(c.ruta+" "+(c.ruta===1?"ruta":"rutes"));return parts.join(" · ")}
+function isMarked(feature){return (feature.properties&&feature.properties.mappiter_state)==="marked"}
+function countLabel(n,singular,plural){return n+" "+(n===1?singular:plural)}
+function listCountsText(feature){const c=summaryCounts(feature);const parts=[];if(c.viv>0)parts.push(countLabel(c.viv,"vivència","vivències"));if(c.fita>0)parts.push(countLabel(c.fita,"fita","fites"));if(c.ruta>0)parts.push(countLabel(c.ruta,"ruta","rutes"));return parts.join(" · ")}
+function escapeHtml(text){return String(text??"").replace(/[&<>\"]/g,function(ch){if(ch==="&")return "&amp;";if(ch==="<")return "&lt;";if(ch===">")return "&gt;";return "&quot;"})}
+document.addEventListener("DOMContentLoaded",init);
+async function init(){
+const status=document.getElementById("status");
+const listScreen=document.getElementById("municipis-list-screen");
+const listContainer=document.getElementById("municipis-list");
+const listEmpty=document.getElementById("municipis-empty");
+const listSearch=document.getElementById("municipis-search");
+const searchFiltersBtn=document.getElementById("municipis-search-filters");
+const mapEmpty=document.getElementById("map-empty");
+const filterSheet=document.getElementById("filters-sheet");
+const filterHandle=document.getElementById("filters-sheet-handle");
+const filterClearBtn=document.getElementById("filters-clear");
+const filterCloseBtn=document.getElementById("filters-close");
+const collapsedSummary=document.getElementById("filters-sheet-summary");
+const collapsedSwitchBtn=document.getElementById("filters-sheet-switch-view");
+const applyMapBtn=document.getElementById("filters-apply-map");
+const applyListBtn=document.getElementById("filters-apply-list");
+const stateButtons=Array.from(document.querySelectorAll("#filter-state-grid .filter-state-chip"));
+const contentButtons=Array.from(document.querySelectorAll("#filter-content-grid .filter-state-chip"));
+const provinceOptions=document.getElementById("province-options");
+const comarcaOptions=document.getElementById("comarca-options");
+const provinceSummary=document.getElementById("province-summary");
+const comarcaSummary=document.getElementById("comarca-summary");
+let municipis=await fetch("municipis_icgc_simplificat.json").then(r=>r.json()).catch(()=>fetch("municipis_icgc.json").then(r=>r.json()));
+const total=municipis.features.length;
+municipis.features=municipis.features.map((f,i)=>{
+  if(!f.properties)f.properties={};
+  f.properties.demo_state=demoState(i,total);
+  if(f.properties&&f.properties.CODIMUNI!=null)f.id=f.properties.CODIMUNI;
+  if(!f.id)f.id=i+1;
+  const s=f.properties.demo_state;
+  const n=i+1;
+  if(s==="default"){f.properties.mappiter_state="unmarked";f.properties.demo_viv=0;f.properties.demo_fita=(n%11===0)?1:0;f.properties.demo_ruta=0;}
+  else if(s==="marked"){f.properties.mappiter_state="marked";f.properties.demo_viv=0;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%13===0)?1:0;}
+  else if(s==="lived"){f.properties.mappiter_state="marked";f.properties.demo_viv=1;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%9===0)?1:0;}
+  else{f.properties.mappiter_state="marked";f.properties.demo_viv=2;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%7===0)?1:0;}
+  f.properties.filter_match=1;
+  return f;
+});
+const featureMap=new Map(municipis.features.map(f=>[String(f.id),f]));
+const municipiListItems=municipis.features.map(f=>({id:String(f.id), searchText:((f.properties&&(f.properties.NOMMUNI||""))||"").toLocaleLowerCase("ca")}));
+function featureKey(featureOrId){
+  if(featureOrId==null) return null;
+  if(typeof featureOrId !== "object") return featureOrId;
+  if(featureOrId.id!=null) return featureOrId.id;
+  if(featureOrId.properties&&featureOrId.properties.CODIMUNI!=null) return featureOrId.properties.CODIMUNI;
+  return null;
+}
+function canonicalFeature(featureOrId){
+  const key = featureKey(featureOrId);
+  if(key==null) return null;
+  return featureMap.get(String(key)) || null;
+}
+function commitSelectedFeature(featureOrId, mutator){
+  const real=canonicalFeature(featureOrId);
+  if(!real||!real.properties) return null;
+  mutator(real);
+  selectedFeature=real;
+  applyFiltersToData();
+  updateCardContent(real);
+  const sel=map.getSource("selected-municipi");
+  if(sel) sel.setData({type:"FeatureCollection",features:[real]});
+  return real;
+}
+const provinces=Array.from(new Set(municipis.features.map(f=>(f.properties&&f.properties.NOMPROV)||""))).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ca"));
+const comarquesByProvince=new Map();
+municipis.features.forEach(f=>{const p=(f.properties&&f.properties.NOMPROV)||"";const c=(f.properties&&f.properties.NOMCOMAR)||"";if(!p||!c)return;if(!comarquesByProvince.has(p))comarquesByProvince.set(p,new Set());comarquesByProvince.get(p).add(c);});
+const allComarques=Array.from(new Set(municipis.features.map(f=>(f.properties&&f.properties.NOMCOMAR)||"").filter(Boolean))).sort((a,b)=>a.localeCompare(b,"ca"));
+const catBounds=bounds(municipis), expandedBounds=expandBounds(catBounds,0.0015);
+const map=new maplibregl.Map({container:"map",style:{version:8,sources:{},layers:[]},attributionControl:false,renderWorldCopies:false,dragRotate:false,pitchWithRotate:false,touchPitch:false});
+map.dragRotate.disable();map.touchZoomRotate.disableRotation();
+const card=document.getElementById("municipi-card"), extra=document.getElementById("card-extra"), toast=document.getElementById("toast"), confirmOverlay=document.getElementById("confirm-overlay");
+let initialCamera=null,suppress=false,selectedFeature=null,cardOpen=false,dragStartPoint=null,focusCenter=null,focusRecentering=false,ignoreUntil=0,cardAnchorTop=0,pendingUnmarkMode=null,currentView="map",selectionMode=false,listLongPressTimer=null,listLongPressId=null,listLongPressSuppressUntil=0,listLongPressPointerId=null,listLongPressStartX=0,listLongPressStartY=0;
+const selectedMunicipiIds=new Set();
+const activeFilters={states:new Set(),content:new Set(),provinces:new Set(),comarques:new Set()};
+const draftFilters={states:new Set(),content:new Set(),provinces:new Set(),comarques:new Set()};
+let sheetState="hidden";
+let dragSheetStartY=null;
+function isListOpen(){return listScreen.classList.contains("open")}
+function openListScreen(){closeCard();listScreen.classList.add("open");listScreen.setAttribute("aria-hidden","false");currentView="list";exitSelectionMode();renderMunicipiList();updateCollapsedSheetAction();exitSearchMode();}
+function closeListScreen(){exitSearchMode();exitSelectionMode();listScreen.classList.remove("open");listScreen.setAttribute("aria-hidden","true");currentView="map";updateCollapsedSheetAction();}
+function enterSearchMode(){listScreen.classList.add("search-mode")}
+function exitSearchMode(){listScreen.classList.remove("search-mode");const cancelBtn=document.getElementById("municipis-search-cancel");if(cancelBtn)cancelBtn.blur();}
+function cloneFilters(source){return {states:new Set(source.states),content:new Set(source.content),provinces:new Set(source.provinces),comarques:new Set(source.comarques)}}
+function copyFiltersInto(source,target){target.states=new Set(source.states);target.content=new Set(source.content);target.provinces=new Set(source.provinces);target.comarques=new Set(source.comarques);}
+function availableComarques(filters=draftFilters){if(filters.provinces.size===0)return allComarques.slice();const set=new Set();filters.provinces.forEach(p=>{(comarquesByProvince.get(p)||new Set()).forEach(c=>set.add(c))});return Array.from(set).sort((a,b)=>a.localeCompare(b,"ca"));}
+function cleanupSelectedComarques(filters=draftFilters){const valid=new Set(availableComarques(filters));Array.from(filters.comarques).forEach(c=>{if(!valid.has(c))filters.comarques.delete(c)});}
+function hasAnyFilters(filters=activeFilters){return filters.states.size>0||filters.content.size>0||filters.provinces.size>0||filters.comarques.size>0}
+function hasActiveFilters(){return hasAnyFilters(activeFilters)}
+function syncDraftFiltersFromActive(){copyFiltersInto(activeFilters,draftFilters);}
+function syncDraftUIFromActive(){syncDraftFiltersFromActive();renderProvinceOptions();renderComarcaOptions();updateFilterUI();}
+function matchesFilters(feature, filters){const p=feature.properties||{};const c=summaryCounts(feature);const marked=isMarked(feature);
+  const wantsMarked=filters.states.has("marked");
+  const wantsUnmarked=filters.states.has("unmarked");
+  if(wantsMarked && !marked) return false;
+  if(wantsUnmarked && marked) return false;
+  if(filters.content.size>0){
+    const matchesContent=(filters.content.has("viv") && c.viv>0) || (filters.content.has("fita") && c.fita>0) || (filters.content.has("ruta") && c.ruta>0);
+    if(!matchesContent) return false;
+  }
+  if(filters.provinces.size>0 && !filters.provinces.has(p.NOMPROV||"")) return false;
+  if(filters.comarques.size>0 && !filters.comarques.has(p.NOMCOMAR||"")) return false;
+  return true;
+}
+function matchesGlobalFilters(feature){return matchesFilters(feature, activeFilters)}
+function countMatchingFilters(filters){let count=0; for(const feature of municipis.features){ if(matchesFilters(feature, filters)) count++; } return count;}
+function updateMapEmptyState(){const count=countMatchingFilters(activeFilters);mapEmpty.classList.toggle("show", count===0 && hasActiveFilters());}
+function applyFiltersToData(){municipis.features.forEach(f=>{f.properties.filter_match=matchesGlobalFilters(f)?1:0;});refreshMap();updateMapEmptyState();updateFilterUI();updateListCount();}
+function renderMunicipiList(){const ids=visibleListFeatureIds();const html=[];for(const id of ids){const feature=featureMap.get(id);if(!feature) continue;const p=feature.properties||{};const selectedClass=selectionMode && selectedMunicipiIds.has(String(id)) ? " is-selected" : "";const selectIndicator=selectionMode ? '<div class="municipi-list-select-indicator" aria-hidden="true">✓</div>' : "";html.push('<button class="municipi-list-row'+selectedClass+'" data-id="'+id+'"><div class="municipi-list-main"><div class="municipi-list-marker">'+(isMarked(feature)?'<span class="municipi-list-marker-dot" aria-hidden="true"></span>':'')+'</div><div><div class="municipi-list-name">'+escapeHtml(p.NOMMUNI||"Municipi")+'</div><div class="municipi-list-meta">'+escapeHtml((p.NOMCOMAR||"Comarca")+' · '+(p.NOMPROV||"Província"))+'</div></div></div><div class="municipi-list-side">'+selectIndicator+'<div class="municipi-list-counts">'+escapeHtml(listCountsText(feature))+'</div></div></button>');}listContainer.innerHTML=html.join("");listEmpty.classList.toggle("show", html.length===0);updateListCount();updateBulkEntry();updateSelectionTip();updateSelectionBarOffset();}
+function syncListIfOpen(){if(isListOpen())renderMunicipiList()}
+function updateListCount(){const el=document.getElementById("municipis-count");if(!el)return;const count=visibleListFeatureIds().length;if(count===0){el.hidden=true;el.textContent="";return;}el.hidden=false;el.textContent="Mostrant "+count+" "+(count===1?"municipi":"municipis");}
+function visibleListFeatureIds(){const term=listSearch.value.trim().toLocaleLowerCase("ca");const ids=[];for(const item of municipiListItems){if(term && item.searchText.indexOf(term)===-1) continue;const feature=featureMap.get(item.id);if(!feature||feature.properties.filter_match!==1) continue;ids.push(item.id);}return ids;}
+function selectionCountText(count){return count+" "+(count===1?"municipi seleccionat":"municipis seleccionats");}
+function markCountButtonText(count){return count===1?"Marcar municipi (1)":"Marcar municipis ("+count+")";}
+function updateSelectionBarOffset(){const bar=document.getElementById("municipis-selection-bar");if(!bar)return;const offset=Math.max(12,window.innerHeight-visibleSheetTop()+12);bar.style.bottom=offset+"px";}
+function updateBulkEntry(){const wrap=document.getElementById("municipis-bulk-entry");if(!wrap)return;const count=visibleListFeatureIds().length;const hasContext=hasActiveFilters() || !!listSearch.value.trim();wrap.hidden=selectionMode || count===0 || !hasContext;}function updateSelectionTip(){const tip=document.getElementById("municipis-selection-tip");if(!tip)return;const count=visibleListFeatureIds().length;tip.hidden=selectionMode || count===0;}
+function updateSelectionInputsState(){listSearch.disabled=selectionMode;searchFiltersBtn.disabled=selectionMode;const cancelBtn=document.getElementById("municipis-search-cancel");if(cancelBtn) cancelBtn.disabled=selectionMode;}
+function updateSelectionUI(){const bar=document.getElementById("municipis-selection-bar");const title=document.getElementById("municipis-selection-title");const confirmBtn=document.getElementById("municipis-selection-confirm");const count=selectedMunicipiIds.size;listScreen.classList.toggle("selection-mode",selectionMode);if(title) title.textContent=selectionCountText(count);if(confirmBtn){confirmBtn.textContent=markCountButtonText(count);confirmBtn.disabled=count===0;}if(bar) bar.classList.toggle("show",selectionMode);updateSelectionInputsState();updateBulkEntry();updateSelectionTip();updateSelectionBarOffset();}
+function enterSelectionMode(ids){selectionMode=true;selectedMunicipiIds.clear();exitSearchMode();(ids||[]).forEach(function(id){selectedMunicipiIds.add(String(id));});updateSelectionUI();renderMunicipiList();}
+function exitSelectionMode(){selectionMode=false;selectedMunicipiIds.clear();updateSelectionUI();renderMunicipiList();}
+function toggleMunicipiSelection(id){const key=String(id);if(selectedMunicipiIds.has(key)) selectedMunicipiIds.delete(key); else selectedMunicipiIds.add(key);updateSelectionUI();renderMunicipiList();}
+function markSelectedMunicipis(){if(selectedMunicipiIds.size===0){exitSelectionMode();return;}selectedMunicipiIds.forEach(function(id){const feature=featureMap.get(String(id));if(!feature||!feature.properties) return;if(feature.properties.mappiter_state==="marked") return;const c=summaryCounts(feature);feature.properties.mappiter_state="marked";feature.properties.demo_state=c.viv>0?"lived":"marked";});applyFiltersToData();exitSelectionMode();showToast("Municipis marcats");}
+function goToMunicipiFromList(id){const feature=featureMap.get(String(id));if(!feature)return;closeListScreen();selectFeature(feature)}
+function refreshMap(){const src=map.getSource("municipis");if(src)src.setData(municipis);const sel=map.getSource("selected-municipi");if(sel&&selectedFeature)sel.setData({type:"FeatureCollection",features:[selectedFeature]});syncListIfOpen();updateSelectionBarOffset();}
+function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(showToast._t);showToast._t=setTimeout(()=>toast.classList.remove("show"),1500)}
+function closeCard(){card.classList.remove("open");extra.classList.remove("open");cardOpen=false;selectedFeature=null;focusCenter=null;const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[]});ignoreUntil=Date.now()+250}
+function closeConfirm(){confirmOverlay.classList.remove("open");pendingUnmarkMode=null;document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent="Aquest municipi té contingut. Què vols fer?";document.getElementById("confirm-step-1").style.display="";document.getElementById("confirm-step-2").style.display="none"}
+function centerMap(){if(!initialCamera)return;suppress=true;closeCard();map.jumpTo(initialCamera);setTimeout(()=>suppress=false,0)}
+function visibleSheetTop(){if(!filterSheet.classList.contains("open")||filterSheet.classList.contains("hidden-sheet"))return window.innerHeight;const sheet=filterSheet.querySelector(".sheet");if(!sheet)return window.innerHeight;const rect=sheet.getBoundingClientRect();return Math.max(0,Math.min(window.innerHeight,rect.top))}
+function applyCardHeightConstraint(){const margin=16;const safeBottom=visibleSheetTop()-12;const maxAllowed=Math.max(220,safeBottom-margin);card.style.maxHeight=Math.floor(Math.min(560,window.innerHeight*0.72,maxAllowed))+"px"}
+function computeCardTop(){if(!selectedFeature)return 0;applyCardHeightConstraint();const box=projectGeomBounds(map, selectedFeature.geometry);const rect=card.getBoundingClientRect();const margin=16;const safeBottom=visibleSheetTop()-12;const preferredBelow=box.maxY+104;const preferredAbove=box.minY-rect.height-104;if(preferredBelow+rect.height<=safeBottom)return preferredBelow;let top=Math.min(preferredAbove,safeBottom-rect.height);if(top<margin)top=Math.max(margin,safeBottom-rect.height);return top}
+function placeCard(lockTop){if(!selectedFeature)return;applyCardHeightConstraint();const center=map.project(featureCenter(selectedFeature.geometry));const rect=card.getBoundingClientRect();const margin=16;let left=center.x, half=rect.width/2;if(left-half<margin)left=margin+half;if(left+half>window.innerWidth-margin)left=window.innerWidth-margin-half;card.style.left=left+"px";if(lockTop){const safeBottom=visibleSheetTop()-12;const top=Math.max(margin,Math.min(cardAnchorTop,safeBottom-rect.height));cardAnchorTop=top;card.style.top=top+"px"}else{cardAnchorTop=computeCardTop();card.style.top=cardAnchorTop+"px"}}
+function targetZoomForFeature(){const minZoom=8.15,maxZoom=8.45,current=map.getZoom();if(current<minZoom)return 8.25;if(current>maxZoom)return current;return current}
+function updateCardActions(){if(!selectedFeature)return;const primary=document.getElementById("btn-primary");const marked=isMarked(selectedFeature);primary.textContent=marked?"Afegir vivència":"Marcar municipi";const actions=marked?[{id:"extra-fita",label:"Afegir fita",full:true},{id:"extra-view",label:"Veure municipi"},{id:"extra-unmark",label:"Desmarcar municipi"}]:[{id:"extra-viv",label:"Afegir vivència",full:true},{id:"extra-fita",label:"Afegir fita"},{id:"extra-view",label:"Veure municipi"}];extra.innerHTML=actions.map(a=>'<button id="'+a.id+'"'+(a.full?' class="full"':'')+'>'+a.label+'</button>').join("");bindExtraButtons()}
+function updateCardContent(feature){const p=feature.properties||{};const summaryEl=document.getElementById("card-summary");const summary=summaryText(feature);document.getElementById("card-title").textContent=p.NOMMUNI||"Municipi";document.getElementById("card-meta").textContent=(p.NOMCOMAR||"Comarca")+" · "+(p.NOMPROV||"Província");summaryEl.textContent=summary;summaryEl.hidden=!summary;updateCardActions();if(cardOpen)setTimeout(function(){placeCard(false)},0)}
+function selectFeature(feature){const real=canonicalFeature(feature);if(!real)return;selectedFeature=real;focusCenter=featureCenter(real.geometry);updateCardContent(real);extra.classList.remove("open");const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[real]});map.easeTo({center:focusCenter,zoom:targetZoomForFeature(),offset:[0,-145],duration:220,essential:true});setTimeout(function(){card.classList.add("open");cardOpen=true;placeCard(false)},230)}
+function markMunicipi(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="marked";target.properties.demo_state="marked";});if(!real)return;showToast("Municipi marcat")}
+function addVivencia(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="marked";target.properties.demo_state="lived";target.properties.demo_viv=Number(target.properties.demo_viv||0)+1;});if(!real)return;showToast("Vivència afegida")}
+function addFita(f){const real=commitSelectedFeature(f,function(target){target.properties.demo_fita=Number(target.properties.demo_fita||0)+1;if(target.properties.mappiter_state==="marked" && Number(target.properties.demo_viv||0)===0){target.properties.demo_state="marked";}});if(!real)return;showToast("Fita afegida")}
+function directUnmark(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="unmarked";target.properties.demo_state="default";target.properties.demo_viv=0;target.properties.demo_fita=0;target.properties.demo_ruta=0;});if(!real)return;showToast("Municipi desmarcat")}
+function unmarkKeepFites(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="unmarked";target.properties.demo_state="default";target.properties.demo_viv=0;target.properties.demo_ruta=0;});if(!real)return;showToast("Municipi desmarcat mantenint fites")}
+function openDecisionDialog(feature){const c=summaryCounts(feature);document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent="Aquest municipi té contingut. Què vols fer?";document.getElementById("confirm-step-1").style.display="";document.getElementById("confirm-step-2").style.display="none";document.getElementById("confirm-keep-fites").style.display = c.fita>0 ? "" : "none";confirmOverlay.classList.add("open")}
+function openFinalConfirm(mode){pendingUnmarkMode=mode;document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent = mode==="keep_fites" ? "Aquesta acció eliminarà definitivament tot el contingut que has registrat en aquest municipi, exceptuant les fites" : "Aquesta acció eliminarà definitivament tot el contingut que has registrat en aquest municipi";document.getElementById("confirm-step-1").style.display="none";document.getElementById("confirm-step-2").style.display="";confirmOverlay.classList.add("open")}
+function handleUnmark(f){const c=summaryCounts(f);if(c.viv===0&&c.fita===0&&c.ruta===0){directUnmark(f);return;}openDecisionDialog(f)}
+function bindExtraButtons(){const g=id=>document.getElementById(id);if(g("extra-view")) g("extra-view").onclick=function(ev){ev.stopPropagation();showToast("Veure municipi")};if(g("extra-viv")) g("extra-viv").onclick=function(ev){ev.stopPropagation();addVivencia(selectedFeature)};if(g("extra-fita")) g("extra-fita").onclick=function(ev){ev.stopPropagation();addFita(selectedFeature)};if(g("extra-unmark")) g("extra-unmark").onclick=function(ev){ev.stopPropagation();handleUnmark(selectedFeature)}}
+function renderProvinceOptions(){provinceOptions.innerHTML=provinces.map(p=>'<label class="filter-check"><input type="checkbox" data-province="'+escapeHtml(p)+'" '+(draftFilters.provinces.has(p)?'checked':'')+'><span>'+escapeHtml(p)+'</span></label>').join("")}
+function renderComarcaOptions(){const available=availableComarques(draftFilters);comarcaOptions.innerHTML=available.map(c=>'<label class="filter-check"><input type="checkbox" data-comarca="'+escapeHtml(c)+'" '+(draftFilters.comarques.has(c)?'checked':'')+'><span>'+escapeHtml(c)+'</span></label>').join("") || '<div class="filter-placeholder">No hi ha comarques disponibles amb la selecció actual.</div>'}
+function summaryForSet(set, singular, plural, allText){if(set.size===0)return allText;if(set.size===1)return Array.from(set)[0];return set.size+" "+plural}
+function labelForContent(key){if(key==="viv") return "Vivències"; if(key==="fita") return "Fites"; return "Rutes";}
+function joinCatalan(items){if(items.length<=1) return items[0]||""; if(items.length===2) return items[0]+" i "+items[1]; return items.slice(0,-1).join(", ")+" i "+items[items.length-1];}
+function filtersSummaryText(){const parts=[];if(activeFilters.states.has("marked")) parts.push("Marcats"); else if(activeFilters.states.has("unmarked")) parts.push("No marcats");if(activeFilters.content.size>0){const order=["viv","fita","ruta"];const labels=order.filter(k=>activeFilters.content.has(k)).map(labelForContent);if(labels.length) parts.push(joinCatalan(labels));}if(activeFilters.comarques.size===1){parts.push(Array.from(activeFilters.comarques)[0]);}else if(activeFilters.comarques.size>1){parts.push(activeFilters.comarques.size+" "+(activeFilters.comarques.size===1?"comarca":"comarques"));}else if(activeFilters.provinces.size===1){parts.push(Array.from(activeFilters.provinces)[0]);}else if(activeFilters.provinces.size>1){parts.push(activeFilters.provinces.size+" "+(activeFilters.provinces.size===1?"província":"províncies"));}const count=countMatchingFilters(activeFilters);const countText=count+" "+(count===1?"municipi":"municipis");if(!parts.length){return countText;}return parts.join(" · ")+" · "+countText; }
+function updateFilterUI(){stateButtons.forEach(btn=>btn.classList.toggle("active",draftFilters.states.has(btn.getAttribute("data-state"))));contentButtons.forEach(btn=>btn.classList.toggle("active",draftFilters.content.has(btn.getAttribute("data-content"))));provinceSummary.textContent=summaryForSet(draftFilters.provinces,"província","províncies","Totes les províncies");comarcaSummary.textContent=summaryForSet(draftFilters.comarques,"comarca","comarques","Totes les comarques");collapsedSummary.textContent=filtersSummaryText();const active=hasActiveFilters();searchFiltersBtn.classList.toggle("filter-active",active);filterClearBtn.classList.toggle("show",hasAnyFilters(draftFilters));updateDraftResultButtons();updateCollapsedSheetAction();}
+function updateDraftResultButtons(){applyMapBtn.textContent="Veure al mapa";applyListBtn.textContent="Veure a la llista";}
+function updateCollapsedSheetAction(){collapsedSwitchBtn.textContent=currentView==="map"?"Veure a la llista":"Veure al mapa"}
+function openFiltersExpanded(){syncDraftUIFromActive();filterSheet.classList.add("open","expanded");filterSheet.classList.remove("hidden-sheet");filterSheet.setAttribute("aria-hidden","false");sheetState="expanded";updateFilterUI();updateSelectionBarOffset();if(cardOpen)setTimeout(function(){placeCard(false)},0)}
+function collapseFiltersSheet(){filterSheet.classList.add("open");filterSheet.classList.remove("expanded","hidden-sheet");filterSheet.setAttribute("aria-hidden","false");sheetState="collapsed";updateFilterUI();updateSelectionBarOffset();if(cardOpen)setTimeout(function(){placeCard(false)},0)}
+function hideFiltersSheet(){if(hasActiveFilters()){collapseFiltersSheet();return;}syncDraftFiltersFromActive();filterSheet.classList.remove("open","expanded");filterSheet.classList.add("hidden-sheet");filterSheet.setAttribute("aria-hidden","true");sheetState="hidden";updateFilterUI();updateSelectionBarOffset();if(cardOpen)setTimeout(function(){placeCard(false)},0)}
+function toggleSheetState(){if(sheetState==="expanded") collapseFiltersSheet(); else openFiltersExpanded();}
+function applyDraftFilters(){copyFiltersInto(draftFilters,activeFilters);applyFiltersToData();}
+function applyAndShow(view){applyDraftFilters(); if(view==="map"){closeListScreen(); currentView="map";} else {openListScreen(); currentView="list";} collapseFiltersSheet();}
+function clearAllFilters(){draftFilters.states.clear();draftFilters.content.clear();draftFilters.provinces.clear();draftFilters.comarques.clear();activeFilters.states.clear();activeFilters.content.clear();activeFilters.provinces.clear();activeFilters.comarques.clear();renderProvinceOptions();renderComarcaOptions();applyFiltersToData();if(currentView==="map" && !isListOpen()) hideFiltersSheet(); else collapseFiltersSheet();}
+window.addEventListener("resize",function(){if(cardOpen)placeCard(false);updateSelectionBarOffset()});
+map.on("load",function(){updateSelectionUI();map.addSource("municipis",{type:"geojson",data:municipis,promoteId:"id"});map.addSource("selected-municipi",{type:"geojson",data:{type:"FeatureCollection",features:[]}});map.addLayer({id:"municipis-fill",type:"fill",source:"municipis",paint:{"fill-color":["case",["==",["get","filter_match"],0],"#C9CED1",["==",["get","mappiter_state"],"unmarked"],"#F3F1EC",["==",["get","demo_viv"],0],"#2EC4CE",["==",["get","demo_viv"],1],"#0B4F8A","#062E57"]}});map.addLayer({id:"municipis-dim",type:"fill",source:"municipis",paint:{"fill-color":"#AEB6BB","fill-opacity":["case",["==",["get","filter_match"],0],0.16,0]}});map.addLayer({id:"selected-fill",type:"fill",source:"selected-municipi",paint:{"fill-color":["case",["==",["get","mappiter_state"],"unmarked"],"#E3D9CB",["==",["get","demo_viv"],0],"#5DD6DA",["==",["get","demo_viv"],1],"#2E689D","#163E63"],"fill-opacity":0.88}});map.addLayer({id:"municipis-line",type:"line",source:"municipis",paint:{"line-color":"#B5BCC0","line-opacity":0.72,"line-width":["interpolate",["linear"],["zoom"],6,0.7,8,0.9,10,1.15]}});map.addLayer({id:"selected-line",type:"line",source:"selected-municipi",paint:{"line-color":"#D45C63","line-width":["interpolate",["linear"],["zoom"],6,1.8,8,2.2,10,2.6]}});map.resize();initialCamera=map.cameraForBounds(catBounds,{padding:{top:28,right:18,bottom:64,left:18}});initialCamera.bearing=0;initialCamera.pitch=0;map.jumpTo(initialCamera);map.setMinZoom(6.1);map.setMaxZoom(10.5);status.style.display="none";syncDraftUIFromActive();applyFiltersToData();});
+map.on("click","municipis-fill",function(e){if(Date.now()<ignoreUntil||isListOpen())return;const feature=e.features&&e.features[0];if(!feature)return;const real=featureMap.get(String(feature.id))||feature;if(cardOpen){closeCard();return}selectFeature(real)});
+map.on("mouseenter","municipis-fill",function(){map.getCanvas().style.cursor="pointer"});
+map.on("mouseleave","municipis-fill",function(){map.getCanvas().style.cursor=""});
+map.on("click",function(e){if(Date.now()<ignoreUntil||isListOpen())return;const feats=map.queryRenderedFeatures(e.point,{layers:["municipis-fill"]});if(cardOpen){if(!card.contains(e.originalEvent.target)){closeCard()}}else if(!feats.length){closeCard()}});
+map.on("dragstart",function(e){if(cardOpen)dragStartPoint=e.point});
+map.on("move",function(){if(cardOpen&&focusCenter&&!focusRecentering){const current=map.getCenter();const dx=current.lng-focusCenter[0],dy=current.lat-focusCenter[1],maxOffset=0.06;if(Math.abs(dx)>maxOffset||Math.abs(dy)>maxOffset){focusRecentering=true;map.easeTo({center:focusCenter,offset:[0,-145],duration:120,essential:true});setTimeout(function(){focusRecentering=false},140)}}});
+map.on("dragend",function(e){if(!cardOpen||!dragStartPoint)return;const dx=e.point.x-dragStartPoint.x,dy=e.point.y-dragStartPoint.y;const dist=Math.sqrt(dx*dx+dy*dy);dragStartPoint=null;if(dist>48){closeCard()}});
+map.on("moveend",function(){if(suppress||!initialCamera)return;const c=map.getCenter();const minLng=expandedBounds[0][0],minLat=expandedBounds[0][1],maxLng=expandedBounds[1][0],maxLat=expandedBounds[1][1];const lng=clamp(c.lng,minLng,maxLng),lat=clamp(c.lat,minLat,maxLat);if(lng!==c.lng||lat!==c.lat){suppress=true;map.easeTo({center:[lng,lat],zoom:map.getZoom(),duration:200,essential:true});setTimeout(function(){suppress=false},220)}});
+document.getElementById("center").addEventListener("click",centerMap);
+document.getElementById("btn-close").addEventListener("click",function(ev){ev.stopPropagation();closeCard()});
+document.getElementById("btn-primary").addEventListener("click",function(ev){ev.stopPropagation();if(!selectedFeature)return;if(isMarked(selectedFeature)){addVivencia(selectedFeature)}else{markMunicipi(selectedFeature)}});
+document.getElementById("btn-more").addEventListener("click",function(ev){ev.stopPropagation();extra.classList.toggle("open");setTimeout(function(){placeCard(false)},10)});
+document.getElementById("confirm-delete-all").addEventListener("click",function(){if(!selectedFeature)return;openFinalConfirm("delete_all");});
+document.getElementById("confirm-keep-fites").addEventListener("click",function(){if(!selectedFeature)return;openFinalConfirm("keep_fites");});
+document.getElementById("confirm-cancel").addEventListener("click",closeConfirm);
+document.getElementById("confirm-final-delete").addEventListener("click",function(){if(!selectedFeature || !pendingUnmarkMode)return;if(pendingUnmarkMode==="keep_fites") unmarkKeepFites(selectedFeature);else directUnmark(selectedFeature);closeConfirm();});
+document.getElementById("confirm-final-cancel").addEventListener("click",closeConfirm);
+confirmOverlay.addEventListener("click",function(ev){if(ev.target===confirmOverlay)closeConfirm()});
+document.getElementById("list-icon").addEventListener("click",function(ev){ev.stopPropagation();openListScreen()});
+document.getElementById("municipis-list-back").addEventListener("click",function(ev){ev.stopPropagation();closeListScreen()});
+document.getElementById("municipis-search-cancel").addEventListener("click",function(ev){ev.stopPropagation();listSearch.value="";listSearch.blur();exitSearchMode();renderMunicipiList()});
+document.getElementById("municipis-bulk-trigger").addEventListener("click",function(){enterSelectionMode(visibleListFeatureIds())});
+document.getElementById("municipis-selection-cancel").addEventListener("click",function(){exitSelectionMode()});
+document.getElementById("municipis-selection-confirm").addEventListener("click",function(){markSelectedMunicipis()});
+listSearch.addEventListener("focus",function(){if(selectionMode){listSearch.blur();return;}enterSearchMode();});
+listSearch.addEventListener("input",function(){if(selectionMode)return;renderMunicipiList();});
+listContainer.addEventListener("pointerdown",function(ev){
+  const row=ev.target.closest(".municipi-list-row");
+  if(!row||selectionMode)return;
+  if(ev.pointerType==="touch"){ev.preventDefault();}
+  clearTimeout(listLongPressTimer);
+  listLongPressId=row.getAttribute("data-id");
+  listLongPressPointerId=ev.pointerId;
+  listLongPressStartX=ev.clientX;
+  listLongPressStartY=ev.clientY;
+  listLongPressTimer=setTimeout(function(){
+    enterSelectionMode([listLongPressId]);
+    listLongPressSuppressUntil=Date.now()+700;
+    listLongPressTimer=null;
+  },430);
+});
+listContainer.addEventListener("pointermove",function(ev){
+  if(!listLongPressTimer||ev.pointerId!==listLongPressPointerId)return;
+  const dx=Math.abs(ev.clientX-listLongPressStartX);
+  const dy=Math.abs(ev.clientY-listLongPressStartY);
+  if(dx>8||dy>8){
+    clearTimeout(listLongPressTimer);
+    listLongPressTimer=null;
+  }
+});
+["pointerup","pointercancel","pointerleave"].forEach(function(type){
+  listContainer.addEventListener(type,function(ev){
+    if(listLongPressTimer&&(!ev.pointerId || ev.pointerId===listLongPressPointerId)){
+      clearTimeout(listLongPressTimer);
+      listLongPressTimer=null;
+    }
+  });
+});
+listContainer.addEventListener("selectstart",function(ev){
+  if(ev.target.closest(".municipi-list-row")) ev.preventDefault();
+});
+listContainer.addEventListener("contextmenu",function(ev){
+  const row=ev.target.closest(".municipi-list-row");
+  if(!row||selectionMode)return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  enterSelectionMode([row.getAttribute("data-id")]);
+  listLongPressSuppressUntil=Date.now()+700;
+});
+listContainer.addEventListener("click",function(ev){
+  const row=ev.target.closest(".municipi-list-row");
+  if(!row)return;
+  if(Date.now()<listLongPressSuppressUntil){
+    ev.preventDefault();
+    ev.stopPropagation();
+    return;
+  }
+  const id=row.getAttribute("data-id");
+  if(selectionMode){
+    toggleMunicipiSelection(id);
+    return;
+  }
+  goToMunicipiFromList(id);
+});
+card.addEventListener("click",function(ev){ev.stopPropagation()});
+stateButtons.forEach(btn=>btn.addEventListener("click",function(){const key=btn.getAttribute("data-state");if(draftFilters.states.has(key)) draftFilters.states.delete(key); else {draftFilters.states.clear();draftFilters.states.add(key);} updateFilterUI();}));
+contentButtons.forEach(btn=>btn.addEventListener("click",function(){const key=btn.getAttribute("data-content");if(draftFilters.content.has(key))draftFilters.content.delete(key);else draftFilters.content.add(key);updateFilterUI();}));
+provinceOptions.addEventListener("change",function(ev){const input=ev.target.closest('input[data-province]');if(!input)return;const value=input.getAttribute('data-province')||"";if(input.checked)draftFilters.provinces.add(value);else draftFilters.provinces.delete(value);cleanupSelectedComarques(draftFilters);renderProvinceOptions();renderComarcaOptions();updateFilterUI();});
+comarcaOptions.addEventListener("change",function(ev){const input=ev.target.closest('input[data-comarca]');if(!input)return;const value=input.getAttribute('data-comarca')||"";if(input.checked)draftFilters.comarques.add(value);else draftFilters.comarques.delete(value);renderComarcaOptions();updateFilterUI();});
+searchFiltersBtn.addEventListener("click",function(ev){ev.stopPropagation();if(selectionMode)return;openFiltersExpanded();});
+filterCloseBtn.addEventListener("click",function(){hideFiltersSheet();});
+filterClearBtn.addEventListener("click",function(){clearAllFilters();});
+applyMapBtn.addEventListener("click",function(){applyAndShow("map")});
+applyListBtn.addEventListener("click",function(){applyAndShow("list")});
+collapsedSwitchBtn.addEventListener("click",function(){if(currentView==="map") applyAndShow("list"); else applyAndShow("map");});
+filterHandle.addEventListener("click",function(){if(sheetState==="hidden") openFiltersExpanded(); else toggleSheetState();});
+filterHandle.addEventListener("pointerdown",function(ev){dragSheetStartY=ev.clientY;});
+filterHandle.addEventListener("pointerup",function(ev){if(dragSheetStartY===null)return;const dy=ev.clientY-dragSheetStartY;dragSheetStartY=null;if(dy<-18) openFiltersExpanded(); else if(dy>18) collapseFiltersSheet();});
+}
+</script>
+</body>
+</html>
