@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mappiter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08262B">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#08262B;overflow:hidden;-webkit-tap-highlight-color:transparent}#municipis-list-screen, #municipis-list-screen *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}#municipis-list-screen input,#municipis-list-screen textarea{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+#mapwrap{position:fixed;inset:0;background:radial-gradient(circle at 50% 43%, #1C6D76 0%, #15565F 25%, #0F3F46 45%, #0C3238 70%, #08262B 100%)}
+#topbar{position:fixed;top:10px;left:12px;right:12px;height:56px;z-index:35;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:0 10px;border-radius:18px;background:#FFFFFF;backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.topbtn{height:40px;width:40px;min-width:40px;border:none;border-radius:12px;background:transparent;color:#17333a;font:inherit;font-weight:700;padding:0;display:grid;place-items:center;font-size:20px}
+#topbar-logo{justify-self:center;height:34px;width:auto;display:block;filter:none}
+#topbar-list{justify-self:end;display:flex;gap:6px}
+.icon-svg{width:22px;height:22px;display:block}
+.icon-svg path,.icon-svg line,.icon-svg rect{stroke:currentColor;fill:none;stroke-width:2.0;stroke-linecap:round;stroke-linejoin:round}
+.icon-svg circle{fill:currentColor;stroke:none}
+#map{position:absolute;inset:0;z-index:1}
+#map-empty{position:fixed;left:50%;top:78px;transform:translateX(-50%);z-index:26;display:none;max-width:min(92vw,420px);background:rgba(255,255,255,.96);color:#395057;border:1px solid rgba(23,51,58,.10);border-radius:14px;padding:10px 14px;box-shadow:0 8px 20px rgba(0,0,0,.10);font-size:14px;line-height:1.35;text-align:center}
+#map-empty.show{display:block}
+#map-context{position:fixed;left:50%;top:78px;transform:translateX(-50%);z-index:27;display:none;max-width:min(calc(100vw - 120px),560px);background:rgba(255,255,255,.97);color:#395057;border:1px solid rgba(23,51,58,.10);border-radius:14px;padding:10px 14px;box-shadow:0 8px 20px rgba(0,0,0,.10);font-size:14px;line-height:1.35;text-align:center}
+#map-context.show{display:block}
+#center{position:fixed;right:16px;bottom:16px;width:48px;height:48px;border-radius:999px;border:none;background:rgba(255,255,255,.96);color:#17333a;box-shadow:0 8px 18px rgba(0,0,0,.16);z-index:20;display:flex;align-items:center;justify-content:center;padding:0}
+#center svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+#status{position:fixed;left:12px;top:64px;background:rgba(8,38,43,.9);color:#F3F1EC;border:1px solid rgba(243,241,236,.14);border-radius:12px;padding:8px 10px;z-index:30;font-weight:700}
+#municipi-card{position:fixed;z-index:40;min-width:262px;max-width:340px;max-height:min(72vh,560px);display:flex;flex-direction:column;background:linear-gradient(180deg, rgba(12,50,56,.96) 0%, rgba(8,38,43,.98) 100%);color:#F3F1EC;border:1px solid rgba(243,241,236,.07);border-radius:18px;padding:12px 14px 12px;box-shadow:0 10px 22px rgba(0,0,0,.24);transform:translate(-50%, 8px) scale(.985);opacity:0;pointer-events:none;transition:transform 170ms ease, opacity 170ms ease;overflow:hidden}
+#municipi-card.open{opacity:1;pointer-events:auto;transform:translate(-50%, 0) scale(1)}
+#municipi-card .card-top{display:flex;justify-content:space-between;align-items:start;gap:8px;flex:0 0 auto}
+#municipi-card .title{font-size:24px;line-height:1.08;font-weight:700;letter-spacing:-.015em;margin:0 0 4px 0;color:#F4F2EC}
+#municipi-card .meta{font-size:15px;line-height:1.25;color:#D0DEE1;margin:0 0 10px 0}
+#municipi-card .card-divider{height:1px;background:rgba(255,255,255,.08);margin:0 0 10px 0}
+#municipi-card .summary{font-size:15px;line-height:1.35;color:#EDF4F5;margin:0 0 12px 0}
+#municipi-card .info-note{font-size:13px;line-height:1.35;color:#D0DEE1;margin:2px 0 0 0}
+#municipi-card .actions{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+#municipi-card .primary{height:42px;border:none;border-radius:999px;padding:0 14px;background:#2aaab3;color:#F9FEFF;font-weight:700;box-shadow:none;font:inherit}
+#municipi-card .iconbtn{width:40px;height:40px;border:none;border-radius:999px;background:rgba(243,241,236,.08);color:#F3F1EC;box-shadow:inset 0 0 0 1px rgba(243,241,236,.08);font-size:19px;font-weight:700;font:inherit}
+#municipi-card .closebtn{width:30px;height:30px;border:none;border-radius:999px;background:rgba(243,241,236,.06);color:#DCE7E9;font-size:16px;line-height:1;font-weight:700}
+#municipi-card .card-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+
+.extra{display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;grid-template-columns:1fr 1fr;gap:8px}
+.extra.open{display:grid;overflow:visible}
+.extra button{width:100%;height:42px;border:none;border-radius:12px;background:rgba(243,241,236,.10);color:#F3F1EC;text-align:left;padding:0 10px;margin:0;font:inherit;font-weight:600}.extra button.full{grid-column:1 / -1}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);background:rgba(8,38,43,.96);color:#F3F1EC;border:1px solid rgba(243,241,236,.10);border-radius:999px;padding:10px 14px;opacity:0;pointer-events:none;z-index:50;transition:opacity 160ms ease, transform 160ms ease;font-size:14px}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:60}
+#confirm-overlay.open{display:block}
+#confirm-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,calc(100vw - 32px));background:rgba(8,38,43,.98);color:#F3F1EC;border:1px solid rgba(243,241,236,.08);border-radius:18px;padding:16px;box-shadow:0 18px 36px rgba(0,0,0,.35)}
+#confirm-dialog h3{margin:0 0 8px 0;font-size:18px}
+#confirm-dialog p{margin:0 0 14px 0;color:#D0DEE1;line-height:1.35}
+#confirm-dialog button{width:100%;height:44px;border:none;border-radius:12px;margin-top:8px;font:inherit}
+#confirm-dialog .danger{background:#b84c4c;color:white}
+#confirm-dialog .soft{background:rgba(243,241,236,.10);color:#F3F1EC}
+#confirm-dialog .cancel{background:transparent;color:#D0DEE1;border:1px solid rgba(243,241,236,.10)}
+
+#municipis-list-screen{position:fixed;inset:0;z-index:45;background:#F7F7F4;color:#17333a;display:none;flex-direction:column}
+#municipis-list-screen.open{display:flex}
+#municipis-list-header{display:flex;align-items:center;gap:10px;padding:10px 12px 8px;background:#FFFFFF;border-bottom:1px solid rgba(23,51,58,.08);min-height:56px;box-sizing:border-box;position:relative;z-index:2;flex:0 0 auto}
+#municipis-list-back{width:40px;height:40px;border:none;border-radius:12px;background:rgba(8,38,43,.06);color:#17333a;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 40px}
+#municipis-list-back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+#municipis-list-title{font-size:18px;font-weight:700;line-height:1.2}
+#municipis-list-tools{padding:10px 12px 8px;background:#FFFFFF;border-bottom:1px solid rgba(23,51,58,.08);position:relative;z-index:3;flex:0 0 auto}
+.municipis-search-row{display:flex;align-items:center;gap:8px}
+#municipis-search{width:100%;height:42px;border:1px solid rgba(23,51,58,.12);border-radius:12px;background:#F7F7F4;color:#17333a;padding:0 14px;box-sizing:border-box;font:inherit;font-size:15px;outline:none;flex:1 1 auto;min-width:0}
+#municipis-search:focus{border-color:rgba(23,51,58,.28)}
+#municipis-search-filters{width:42px;height:42px;border:none;border-radius:12px;background:#EEF1EF;color:#17333a;display:flex;align-items:center;justify-content:center;flex:0 0 42px;position:relative}
+#municipis-search-filters.filter-active{background:#17333a;color:#FFFFFF}
+#municipis-search-filters.filter-active::after{content:"";position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#1ECAD3}
+#municipis-search-filters svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#municipis-search-cancel{display:none;height:42px;border:none;background:transparent;color:#17333a;font:inherit;font-size:15px;font-weight:600;padding:0 4px;flex:0 0 auto}
+#municipis-list-screen.search-mode #municipis-list-header{display:none}
+#municipis-list-screen.search-mode #municipis-search-cancel{display:block}
+#municipis-list{flex:1 1 auto;overflow:auto;background:#F7F7F4;-webkit-overflow-scrolling:touch}
+.municipi-list-row{width:100%;border:none;border-bottom:1px solid rgba(23,51,58,.08);background:transparent;padding:11px 12px;text-align:left;color:inherit;font:inherit;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(96px,170px);gap:10px;align-items:start;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.municipi-list-row:active{background:rgba(23,51,58,.05)}
+.municipi-list-row,.municipi-list-row *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.municipi-list-main{min-width:0;display:grid;grid-template-columns:10px minmax(0,1fr);column-gap:8px;align-items:center}
+.municipi-list-name{font-size:15px;font-weight:700;line-height:1.25;color:#17333a;white-space:normal;overflow:visible;text-overflow:clip;word-break:normal;overflow-wrap:normal;hyphens:none}
+.municipi-list-meta{font-size:13px;line-height:1.2;color:#5F7278;white-space:normal;overflow:visible;text-overflow:clip;margin-top:4px;word-break:break-word}
+.municipi-list-marker{width:10px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;align-self:center;height:100%}
+.municipi-list-marker-dot{width:7px;height:7px;border-radius:50%;background:#1ECAD3;display:block}.municipi-list-row.is-marked .municipi-list-marker-dot{background:#1ECAD3;opacity:1}.municipi-list-row.is-lived .municipi-list-marker-dot{background:#0B4F8A;opacity:1}.municipi-list-row.is-lived-multi .municipi-list-marker-dot{background:#083B66;opacity:1;box-shadow:0 0 0 1.75px rgba(8,59,102,.18)}
+.municipi-list-side{display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-start;gap:4px;min-width:78px;max-width:142px;align-self:stretch}
+.municipi-list-counts{font-size:12px;line-height:1.3;color:#17333a;font-weight:700;text-align:right;white-space:normal;overflow:visible;text-overflow:clip;max-width:none;text-wrap:balance}
+#municipis-empty{display:none;padding:18px 12px;color:#5F7278;font-size:14px}
+#municipis-empty.show{display:block}
+#municipis-count{padding:8px 12px 10px;color:#5F7278;font-size:14px;font-weight:600;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-count[hidden]{display:none}
+#municipis-list-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px 10px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-actions.has-clear-filters{grid-template-columns:1fr 1fr}
+#municipis-list-actions.has-clear-filters #municipis-list-direct-mark{grid-column:1 / -1}
+#municipis-list-clear-filters{display:none;background:#FFFFFF;color:#17333a;border:1px solid rgba(23,51,58,.12)}
+#municipis-list-actions[hidden]{display:none}
+#municipis-list-actions button{height:44px;border:none;border-radius:12px;font:inherit;font-weight:700;padding:0 14px}
+#municipis-list-direct-mark{grid-column:1 / -1;background:#17333a;color:#FFFFFF}
+#municipis-list-mark{background:#EEF1EF;color:#17333a}
+#municipis-list-view-map{background:#FFFFFF;color:#17333a;border:1px solid rgba(23,51,58,.12)}
+#municipis-list-feedback{padding:10px 12px;background:#F7F7F4;color:#17333a;font-size:14px;font-weight:600;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-feedback[hidden]{display:none}
+#filters-count{padding:8px 0 10px;color:#5F7278;font-size:14px;font-weight:600;text-align:left}
+
+
+.modal-overlay{position:fixed;inset:0;background:rgba(8,38,43,.38);z-index:70;display:none;align-items:flex-end;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal-card{width:min(100%,520px);background:#FFFFFF;border-radius:22px;padding:18px 16px 16px;box-shadow:0 16px 40px rgba(0,0,0,.22)}
+.modal-title{font-size:18px;line-height:1.25;font-weight:700;color:#17333a;margin:0 0 12px}
+.modal-text{font-size:14px;line-height:1.45;color:#395057;white-space:pre-line}
+.modal-actions{display:flex;gap:10px;margin-top:16px}
+.modal-actions button{height:44px;border:none;border-radius:12px;font:inherit;font-weight:700;padding:0 14px}
+.modal-primary{background:#17333a;color:#FFFFFF;flex:1 1 auto}
+.modal-secondary{background:#EEF1EF;color:#17333a;flex:0 0 auto}
+
+#filters-sheet{position:fixed;left:0;right:0;bottom:0;z-index:48;display:none;pointer-events:none}
+#filters-sheet.open{display:block}
+#filters-sheet .sheet{width:min(100vw,560px);margin:0 auto;background:#FFFFFF;border-radius:22px 22px 0 0;box-shadow:0 -10px 26px rgba(0,0,0,.18);pointer-events:auto;transform:translateY(calc(100% - 114px));transition:transform 180ms ease}
+#filters-sheet.expanded .sheet{transform:translateY(0)}
+#filters-sheet.hidden-sheet{display:none}
+#filters-sheet-content{padding:0 16px 16px;max-height:min(68vh,620px);overflow:auto}
+.filters-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;position:sticky;top:0;background:#FFFFFF;z-index:2;padding-bottom:4px}
+.filters-sheet-title{font-size:20px;font-weight:700;color:#17333a}
+.filters-sheet-head-actions{display:flex;align-items:center;gap:8px}
+#filters-clear{border:none;background:transparent;color:#17333a;font:inherit;font-weight:600;padding:8px 6px;display:block}
+#filters-close{width:36px;height:36px;border:none;border-radius:999px;background:#EEF1EF;color:#17333a;font-size:18px;line-height:1}
+.filter-block{margin-top:14px}
+.filter-block-title{font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5F7278;margin-bottom:10px}
+.filter-state-grid{display:flex;flex-wrap:wrap;gap:8px}
+.filter-state-chip{height:34px;border:none;border-radius:999px;background:#EEF1EF;color:#395057;padding:0 12px;font:inherit;font-size:14px;font-weight:600;transition:background-color 140ms ease,color 140ms ease, box-shadow 140ms ease, border-color 140ms ease}
+.filter-state-chip.active{background:#17333a;color:#FFFFFF}
+#filter-state-grid .filter-state-chip{position:relative;padding:0 14px 0 38px;box-shadow:inset 0 0 0 1px rgba(23,51,58,.10)}
+#filter-state-grid .filter-state-chip::before{content:"";position:absolute;left:14px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(57,80,87,.42);background:#FFFFFF}
+#filter-state-grid .filter-state-chip.active{box-shadow:inset 0 0 0 2px rgba(23,51,58,.96);background:#E9F1F2;color:#17333a}
+#filter-state-grid .filter-state-chip.active::before{box-shadow:inset 0 0 0 4px #17333a;background:#FFFFFF}
+.filter-select{border:1px solid rgba(23,51,58,.12);border-radius:14px;background:#F7F7F4;margin-bottom:10px;overflow:hidden}
+.filter-select summary{list-style:none;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;font-weight:600;color:#17333a}
+.filter-select summary::-webkit-details-marker{display:none}
+.filter-select summary::after{content:"⌄";font-size:16px;color:#5F7278}
+.filter-select[open] summary::after{content:"⌃"}
+.filter-select-panel{max-height:190px;overflow:auto;padding:0 14px 12px;border-top:1px solid rgba(23,51,58,.08)}
+.filter-check{display:flex;align-items:center;gap:10px;padding:10px 0;font-size:14px;color:#17333a}
+.filter-check + .filter-check{border-top:1px solid rgba(23,51,58,.06)}
+.filter-check input{width:16px;height:16px}
+.filter-placeholder{border:1px dashed rgba(23,51,58,.14);border-radius:14px;padding:12px 14px;color:#7B8A8F;font-size:14px;background:#FBFBF9}
+.filters-sheet-footer{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.filters-sheet-footer button{height:44px;border:none;border-radius:999px;font:inherit;font-weight:700;padding:0 16px}
+#filters-apply-list{background:#2AAAB3;color:#FFFFFF}#filters-cancel{background:#EEF1EF;color:#17333a}
+#filters-sheet-summary{font-size:14px;line-height:1.25;color:#395057;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+
+*{-webkit-tap-highlight-color:transparent}
+.municipi-list-row{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-top-right,.maplibregl-ctrl-top-left{display:none!important}
+
+
+/* --- Redisseny bloc Filtres canònic --- */
+#municipis-list-screen.simple-result #municipis-list-tools{padding-bottom:10px}
+#municipis-list-screen.simple-result #municipis-search-filters{display:none}
+#municipis-list-screen.simple-result #municipis-search-cancel{display:none!important}
+#municipis-list-screen.simple-result #municipis-count{display:block!important;padding:8px 12px 10px;color:#395057;font-size:14px;font-weight:700;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-screen.simple-municipis #municipis-count{display:none!important}
+#municipis-list-actions{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 12px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-actions[hidden]{display:none!important}
+#municipis-list-actions button{height:46px;border-radius:12px}
+#municipis-list-view-map{background:#17333a;color:#FFFFFF;border:none}
+#municipis-list-modify-filters{background:#FFFFFF;color:#17333a;border:1px solid rgba(23,51,58,.12)}
+#municipis-list-clear-filters{background:#EEF1EF;color:#17333a;border:none}
+#filters-sheet{inset:0;z-index:56;background:rgba(8,38,43,.38);padding:16px;display:none;align-items:flex-end;justify-content:center;pointer-events:auto}
+#filters-sheet.open{display:flex}
+#filters-sheet .sheet{width:min(100%,560px);max-height:min(92vh,820px);margin:0;background:#FFFFFF;border-radius:22px;box-shadow:0 16px 40px rgba(0,0,0,.22);transform:none;display:flex;flex-direction:column}
+#filters-sheet-content{display:block!important;padding:16px;max-height:none;overflow:auto}
+#filters-close{width:40px;height:40px;border-radius:12px;font-size:20px}
+#filters-clear{display:none!important}
+#filters-count{padding:10px 0 0;color:#395057;font-size:14px;font-weight:700}
+.filters-sheet-footer{grid-template-columns:1fr 1fr;position:sticky;bottom:0;background:#FFFFFF;padding-top:14px}
+#filters-apply-list{background:#17333a;color:#FFFFFF}
+#filters-cancel{background:#EEF1EF;color:#17333a}
+#map-context{top:86px;max-width:min(calc(100vw - 176px),320px);padding:10px 14px}
+#center{bottom:16px}
+
+/* --- Patró comú de pantalles --- */
+.screen-header,.filters-screen-header,.map-screen-header{display:flex;align-items:center;gap:12px;padding:14px 14px 12px;background:#08262B;color:#F3F1EC;border-bottom:1px solid rgba(243,241,236,.08)}
+.screen-header-back,.filters-screen-back,.map-screen-back{width:42px;height:42px;flex:0 0 42px;border:none;border-radius:12px;background:rgba(243,241,236,.08);color:#F3F1EC;display:flex;align-items:center;justify-content:center;padding:0}
+.screen-header-back svg,.filters-screen-back svg,.map-screen-back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.screen-header-main,.filters-screen-header-main,.map-screen-header-main{min-width:0;display:flex;align-items:center;gap:10px;flex:1 1 auto}
+.screen-header-title,.filters-screen-title,.map-screen-title{font-size:22px;line-height:1.1;font-weight:800;letter-spacing:-.02em;color:#F7F7F4}
+.screen-count-badge,.filters-count-badge,.map-count-badge{display:none;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 10px;border-radius:999px;background:#1ECAD3;color:#08262B;font-size:15px;font-weight:800;line-height:1}
+.screen-count-badge.show,.filters-count-badge.show,.map-count-badge.show{display:flex}
+#municipis-list-screen{background:#F7F7F4}
+#municipis-list-header{padding:0;min-height:0;background:transparent;border-bottom:none}
+#municipis-list-title{font-size:22px;font-weight:800;line-height:1.1;letter-spacing:-.02em}
+#municipis-list-back{background:rgba(243,241,236,.08);color:#F3F1EC}
+#municipis-list-tools{padding:12px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-screen.simple-result #municipis-list-tools{padding-top:12px;padding-bottom:12px}
+#municipis-list-screen.simple-result #municipis-count{display:none!important}
+#municipis-list-actions{padding:12px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list{background:#F7F7F4}
+#filters-sheet{inset:0;padding:0;background:#F7F7F4;display:none;z-index:57}
+#filters-sheet.open{display:block}
+#filters-sheet .sheet{width:100%;max-width:none;height:100%;max-height:none;border-radius:0;box-shadow:none;background:#F7F7F4}
+#filters-sheet-content{padding:0;height:100%;display:flex!important;flex-direction:column;overflow:hidden}
+.filters-screen-body{padding:12px 12px 16px;overflow:auto;flex:1 1 auto}
+.filters-screen-header{position:sticky;top:0;z-index:2}
+.filters-sheet-top{display:none}
+.filter-block:first-child{margin-top:0}
+#filters-count{padding:12px 0 0;color:#395057;font-size:14px;font-weight:700}
+.filters-sheet-footer{position:static;padding:14px 12px 16px;margin-top:0;background:#F7F7F4;border-top:1px solid rgba(23,51,58,.08)}
+#filters-apply-list,#filters-cancel{height:46px;border-radius:14px}
+#topbar.filters-map-hidden{display:none}
+#map-screen-header{position:fixed;top:0;left:0;right:0;z-index:36;display:none}
+#map-screen-header.show{display:flex}
+#map-screen-header .map-screen-title{max-width:none}
+#map-context{display:none!important}
+body.filters-map-screen #center{bottom:20px;right:16px}
+
+
+/* --- Consolidació final bloc Filtres --- */
+.screen-header,.filters-screen-header,.map-screen-header{width:100%;box-sizing:border-box;justify-content:flex-start;padding:14px 16px 12px;background:#08262B;color:#F3F1EC;border-bottom:1px solid rgba(243,241,236,.08)}
+.screen-header-back,.filters-screen-back,.map-screen-back,.screen-header-icon,.map-screen-close{width:42px;height:42px;flex:0 0 42px;border:none;border-radius:12px;background:rgba(243,241,236,.08);color:#F3F1EC;display:flex;align-items:center;justify-content:center;padding:0}
+.screen-header-back svg,.filters-screen-back svg,.map-screen-back svg,.screen-header-icon svg,.map-screen-close svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.screen-header-main,.filters-screen-header-main,.map-screen-header-main{min-width:0;display:flex;align-items:center;gap:10px;flex:1 1 auto}
+.screen-header-title-wrap,.filters-screen-title-wrap,.map-screen-title-wrap{min-width:0;display:flex;flex-direction:column;gap:2px}
+.screen-header-title,.filters-screen-title,.map-screen-title{font-size:22px;line-height:1.1;font-weight:800;letter-spacing:-.02em;color:#F7F7F4}
+.screen-header-meta,.filters-screen-meta,.map-screen-meta{font-size:13px;line-height:1.25;color:rgba(243,241,236,.76);font-weight:600}
+.screen-header-actions,.filters-screen-actions,.map-screen-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.screen-header-home img,.filters-screen-home img,.map-screen-home img{width:22px;height:22px;display:block}
+#municipis-list-header,#map-screen-header{padding:0;background:transparent;border-bottom:none}
+#municipis-list-tools{padding:12px 12px 12px;background:#F7F7F4;border-bottom:1px solid rgba(23,51,58,.08)}
+#municipis-list-screen.simple-result #municipis-list-tools{padding-top:12px}
+#municipis-list-screen.simple-municipis #municipis-list-badge{display:none!important}
+#municipis-search-filters{width:42px;height:42px;flex:0 0 42px}
+#municipis-search-cancel{margin-left:8px}
+.municipis-search-row{gap:0}
+#municipis-search{width:100%}
+.filter-state-grid{display:flex;flex-wrap:wrap;gap:8px}
+.filter-state-chip{height:38px;border:none;border-radius:999px;background:#EEF1EF;color:#17333a;padding:0 14px;font:inherit;font-size:14px;font-weight:700;box-shadow:inset 0 0 0 1px rgba(23,51,58,.10);transition:background-color 140ms ease,color 140ms ease, box-shadow 140ms ease, border-color 140ms ease}
+.filter-state-chip.active{background:#17333a;color:#FFFFFF;box-shadow:inset 0 0 0 2px rgba(23,51,58,.96)}
+#filter-state-grid .filter-state-chip,#filter-content-grid .filter-state-chip{padding:0 14px;box-shadow:inset 0 0 0 1px rgba(23,51,58,.10)}
+#filter-state-grid .filter-state-chip::before{display:none}
+#filter-state-grid .filter-state-chip.active,#filter-content-grid .filter-state-chip.active{background:#17333a;color:#FFFFFF;box-shadow:inset 0 0 0 2px rgba(23,51,58,.96)}
+#map-screen-header{position:fixed;top:0;left:0;right:0;z-index:36;display:none}
+#map-screen-header.show{display:flex}
+body.filters-map-screen #center{bottom:20px;right:16px}
+body.filters-map-screen #municipi-card{z-index:41}
+
+/* --- Simplificació final capçalera i navegació --- */
+.screen-header,.filters-screen-header,.map-screen-header{padding:0!important;background:#08262B!important;border-bottom:none!important}
+.header-stack{width:100%;display:flex;flex-direction:column;background:#08262B;color:#F3F1EC}
+.header-top-row{display:flex;align-items:center;gap:12px;padding:14px 16px 10px}
+.header-subnav{display:flex;align-items:center;justify-content:space-between;padding:0 16px 12px;border-top:1px solid rgba(243,241,236,.08)}
+.header-text-action{border:none;background:transparent;color:#F3F1EC;font:inherit;font-size:15px;font-weight:700;line-height:1;padding:8px 0}
+.header-text-action:active{opacity:.72}
+#municipis-list-header .header-subnav[hidden]{display:none!important}
+#municipis-list-header .screen-header-actions{gap:14px}
+#municipis-list-header .header-text-action{padding:8px 0}
+#map-screen-header.show{display:block}
+#map-screen-header .header-stack{box-shadow:0 1px 0 rgba(243,241,236,.08)}
+.filters-screen-header .header-stack{position:sticky;top:0;z-index:3}
+#municipis-list-header .header-stack{box-shadow:0 1px 0 rgba(243,241,236,.08)}
+body.filters-map-screen #center{bottom:20px;right:16px;z-index:42}
+
+
+/* --- Header specific Municipis filtrats --- */
+#municipis-list-screen.simple-result #municipis-list-header{position:relative;z-index:4;background:#08262B}
+#municipis-list-screen.simple-result .screen-header.municipis-header-stack{display:block;width:100%;padding:18px 0 10px;background:#08262B;color:#F3F1EC;box-sizing:border-box;box-shadow:0 1px 0 rgba(243,241,236,.08)}
+#municipis-list-screen.simple-result .header-top-row{display:grid;grid-template-columns:56px minmax(0,1fr) 56px;align-items:center;column-gap:0;padding:0 4px;box-sizing:border-box;width:100%;min-height:56px}
+#municipis-list-screen.simple-result #municipis-list-back{position:static;left:auto;top:auto;margin:0;justify-self:start;align-self:center}
+#municipis-list-screen.simple-result .screen-header-main{display:block;min-width:0;width:100%;padding:0;box-sizing:border-box;align-self:center}
+#municipis-list-screen.simple-result .screen-header-title-wrap{display:block;min-width:0;width:100%}
+#municipis-list-screen.simple-result .screen-header-title{text-align:center;font-size:20px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;width:100%}
+#municipis-list-screen.simple-result #municipis-list-meta{display:none!important}
+#municipis-list-screen.simple-result #municipis-list-header-actions{position:relative;display:flex!important;align-items:center;justify-content:flex-end;justify-self:end;align-self:center;gap:0;width:48px;height:42px}
+#municipis-list-screen.simple-result #municipis-list-header-actions #municipis-search-filters{display:none!important}
+#municipis-list-screen.simple-result #list-home{display:none!important}
+#municipis-list-screen.simple-result #result-menu-toggle{display:flex!important}
+#municipis-list-screen.simple-result .result-badge-row{display:flex!important;align-items:center;justify-content:center;padding:2px 0 12px}
+#municipis-list-screen.simple-result .result-badge-row[hidden]{display:flex!important}
+#municipis-list-screen.simple-result #municipis-list-badge{min-width:0;height:24px;padding:0 12px;border-radius:999px;font-size:13px;line-height:1;background:#1ECAD3;color:#08262B}
+#municipis-list-screen.simple-result #municipis-list-subnav{display:none!important}
+#municipis-list-screen.simple-municipis #municipis-list-badge-row{display:none!important}
+#municipis-list-screen.simple-result #municipis-list-actions{order:3;grid-template-columns:1fr 1fr;gap:10px;padding:12px;background:#F7F7F4;border-top:1px solid rgba(23,51,58,.08);border-bottom:none}
+#municipis-list-screen.simple-result #municipis-list-clear-filters{display:none!important}
+#municipis-list-screen.simple-result #municipis-list-view-map,
+#municipis-list-screen.simple-result #municipis-list-modify-filters{display:block!important;height:46px}
+#municipis-list-screen.simple-result #municipis-list{order:2;min-height:0}
+#municipis-list-screen.simple-result #municipis-empty{order:2}
+.result-overflow-menu{position:absolute;top:46px;right:0;z-index:20;display:none;min-width:122px;background:#F3F1EC;border:1px solid rgba(23,51,58,.10);border-radius:12px;box-shadow:0 10px 24px rgba(0,0,0,.18);overflow:hidden}
+.result-overflow-menu.open{display:block}
+.result-overflow-menu button{width:100%;height:42px;border:none;background:transparent;display:flex;align-items:center;gap:9px;padding:0 10px;color:#17333a;font:inherit;font-size:14px;font-weight:700;text-align:left}
+.result-overflow-menu button+button{border-top:1px solid rgba(23,51,58,.08)}
+.result-overflow-menu-icon{width:22px;height:22px;flex:0 0 22px;display:flex;align-items:center;justify-content:center}
+.result-overflow-menu-icon svg{width:20px;height:20px;display:block}
+.result-overflow-menu-icon img{width:22px;height:22px;display:block;object-fit:contain;background:#fff;border-radius:6px}
+#result-menu-toggle{display:none;width:42px;height:42px;border:none;border-radius:12px;background:rgba(243,241,236,.08);color:#F3F1EC;align-items:center;justify-content:center;padding:0}
+#result-menu-toggle .dots{font-size:28px;line-height:1;transform:translateY(-3px)}
+
+</style>
+</head>
+<body>
+<div id="topbar">
+  <button class="topbtn" id="btn-menu" aria-label="Menú">
+    <svg class="icon-svg" viewBox="0 0 24 24">
+      <circle cx="12" cy="5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="12" cy="19" r="2.4" fill="currentColor" stroke="none"></circle>
+    </svg>
+  </button>
+  <img id="topbar-logo" src="logo_mappiter_verd_sensefons.png" alt="Mappiter">
+  <div id="topbar-list">
+  <button class="topbtn" id="list-icon">
+    <svg class="icon-svg" viewBox="0 0 24 24">
+      <circle cx="5" cy="4.5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="5" cy="12" r="2.4" fill="currentColor" stroke="none"></circle>
+      <circle cx="5" cy="19.5" r="2.4" fill="currentColor" stroke="none"></circle>
+      <line x1="9" y1="4.5" x2="19.5" y2="4.5"></line>
+      <line x1="9" y1="12" x2="19.5" y2="12"></line>
+      <line x1="9" y1="19.5" x2="19.5" y2="19.5"></line>
+    </svg>
+  </button>
+</div>
+</div>
+<div id="map-screen-header" class="map-screen-header">
+  <div class="header-stack">
+    <div class="header-top-row">
+      <button id="map-screen-back" class="map-screen-back" type="button" aria-label="Tornar a municipis filtrats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"></path></svg>
+      </button>
+      <div class="map-screen-header-main">
+        <div class="map-screen-title-wrap">
+          <div class="map-screen-title">Mapa municipis filtrats</div>
+        </div>
+        <div id="map-screen-badge" class="map-count-badge" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="header-subnav">
+      <button id="map-home" class="header-text-action" type="button">Inici</button>
+      <button id="map-screen-to-municipis" class="header-text-action" type="button">Municipis</button>
+    </div>
+  </div>
+</div>
+<div id="mapwrap"><div id="map"></div></div>
+<div id="map-empty">No s'han trobat municipis amb aquests filtres</div>
+<div id="map-context"></div>
+<div id="status">Carregant mapa…</div>
+<button id="center" aria-label="Centrar Catalunya"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.25"></circle><path d="M12 2.75v3.25"></path><path d="M12 18v3.25"></path><path d="M2.75 12H6"></path><path d="M18 12h3.25"></path></svg></button>
+
+<div id="municipi-card" aria-live="polite">
+  <div class="card-top">
+    <div>
+      <div class="title" id="card-title">Begur</div>
+      <div class="meta" id="card-meta">Baix Empordà · Girona</div>
+    </div>
+    <button class="closebtn" id="btn-close" aria-label="Tancar">×</button>
+  </div>
+  <div class="card-body">
+    <div class="card-divider" aria-hidden="true"></div>
+    <div class="summary" id="card-summary" hidden></div>
+    <div class="actions">
+      <button class="primary" id="btn-primary">Marcar municipi</button>
+      <button class="iconbtn" id="btn-more" aria-label="Més accions">…</button>
+    </div>
+    <div id="card-extra" class="extra"></div>
+  </div>
+</div>
+
+<div id="municipis-list-screen" aria-hidden="true">
+  <div id="municipis-list-header">
+    <div class="screen-header header-stack municipis-header-stack">
+      <div class="header-top-row">
+        <button id="municipis-list-back" class="screen-header-back" aria-label="Tornar al mapa base">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"></path></svg>
+        </button>
+        <div class="screen-header-main">
+          <div class="screen-header-title-wrap">
+            <div id="municipis-list-title" class="screen-header-title">Municipis</div>
+            <div id="municipis-list-meta" class="screen-header-meta">947 municipis</div>
+          </div>
+        </div>
+        <div id="municipis-list-header-actions" class="screen-header-actions">
+          <button id="municipis-search-filters" class="screen-header-icon" type="button" aria-label="Filtres">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></svg>
+          </button>
+          <button id="list-home" class="header-text-action" type="button">Inici</button>
+          <button id="result-menu-toggle" type="button" aria-label="Més opcions"><span class="dots">…</span></button>
+          <div id="result-overflow-menu" class="result-overflow-menu" aria-hidden="true">
+            <button id="result-menu-home" type="button">
+              <span class="result-overflow-menu-icon"><img src="mappiter_menu_icon_exact.png" alt=""></span>
+              <span>Inici</span>
+            </button>
+            <button id="result-menu-municipis" type="button">
+              <span id="result-menu-municipis-icon-host" class="result-overflow-menu-icon"></span>
+              <span>Municipis</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="municipis-list-badge-row" class="result-badge-row" hidden>
+        <div id="municipis-list-badge" class="screen-count-badge" aria-live="polite"></div>
+      </div>
+      <div id="municipis-list-subnav" class="header-subnav" hidden>
+        <button id="result-home" class="header-text-action" type="button">Inici</button>
+        <button id="result-to-municipis" class="header-text-action" type="button">Municipis</button>
+      </div>
+    </div>
+  </div>
+  <div id="municipis-list-tools">
+    <div class="municipis-search-row">
+      <input id="municipis-search" type="search" inputmode="search" placeholder="Cercar municipi" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+      <button id="municipis-search-cancel" type="button" aria-label="Cancel·lar cerca">Cancel·lar</button>
+    </div>
+  </div>
+  <div id="municipis-count" aria-live="polite"></div>
+  <div id="municipis-list-actions" hidden><button id="municipis-list-view-map" type="button">Veure al mapa</button><button id="municipis-list-modify-filters" type="button">Modificar filtres</button><button id="municipis-list-clear-filters" type="button">Treure filtres</button></div>
+  <div id="municipis-empty">No s'han trobat municipis</div>
+  <div id="municipis-list"></div>
+</div>
+
+<div id="filters-sheet" aria-hidden="true">
+  <div class="sheet">
+    <div id="filters-sheet-content">
+      <div class="filters-screen-header header-stack">
+        <div class="header-top-row">
+          <button id="filters-close" class="filters-screen-back" type="button" aria-label="Tornar a municipis">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"></path></svg>
+          </button>
+          <div class="filters-screen-header-main">
+            <div class="filters-screen-title-wrap">
+              <div class="filters-screen-title">Filtres</div>
+            </div>
+            <div id="filters-active-badge" class="filters-count-badge" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="header-subnav">
+          <button id="filters-home" class="header-text-action" type="button">Inici</button>
+          <button id="filters-to-municipis" class="header-text-action" type="button">Municipis</button>
+        </div>
+      </div>
+      <div class="filters-screen-body">
+      <div class="filter-block">
+        <div class="filter-block-title">Estat del municipi</div>
+        <div class="filter-state-grid" id="filter-state-grid">
+          <button class="filter-state-chip" type="button" data-state="marked">Marcats</button>
+          <button class="filter-state-chip" type="button" data-state="unmarked">No marcats</button>
+        </div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-block-title">Territori</div>
+        <details class="filter-select" id="province-select">
+          <summary id="province-summary">Totes les províncies</summary>
+          <div class="filter-select-panel" id="province-options"></div>
+        </details>
+        <details class="filter-select" id="comarca-select">
+          <summary id="comarca-summary">Totes les comarques</summary>
+          <div class="filter-select-panel" id="comarca-options"></div>
+        </details>
+      </div>
+      <div class="filter-block">
+        <div class="filter-block-title">Contingut registrat</div>
+        <div class="filter-state-grid" id="filter-content-grid">
+          <button class="filter-state-chip" type="button" data-content="viv">Amb vivències</button>
+          <button class="filter-state-chip" type="button" data-content="fita">Amb fites</button>
+          <button class="filter-state-chip" type="button" data-content="ruta">Amb rutes</button>
+        </div>
+        
+      </div>
+      <div id="filters-count"></div>
+      </div>
+      <div class="filters-sheet-footer">
+        <button id="filters-apply-list" type="button">Aplicar filtres</button>
+        <button id="filters-cancel" type="button">Netejar filtres</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+<div id="confirm-overlay">
+  <div id="confirm-dialog">
+    <h3 id="confirm-title">Desmarcar municipi</h3>
+    <p id="confirm-text">Aquest municipi té contingut. Què vols fer?</p>
+    <div id="confirm-step-1">
+      <button class="danger" id="confirm-delete-all">Desmarcar i eliminar tot el contingut</button>
+      <button class="soft" id="confirm-keep-fites">Desmarcar mantenint les fites</button>
+      <button class="cancel" id="confirm-cancel">Cancel·lar</button>
+    </div>
+    <div id="confirm-step-2" style="display:none">
+      <button class="danger" id="confirm-final-delete">Eliminar</button>
+      <button class="cancel" id="confirm-final-cancel">Cancel·lar</button>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+function bounds(fc){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}fc.features.forEach(f=>scan(f.geometry.coordinates));return [[minX,minY],[maxX,maxY]]}
+function expandBounds(b,f){const minX=b[0][0],minY=b[0][1],maxX=b[1][0],maxY=b[1][1];const dx=(maxX-minX)*f,dy=(maxY-minY)*f;return [[minX-dx,minY-dy],[maxX+dx,maxY+dy]]}
+function clamp(n,min,max){return Math.min(max,Math.max(min,n))}
+function demoState(i,total){const multiple=Math.floor(total*0.10), lived=Math.floor(total*0.25), marked=Math.floor(total*0.50);if(i<multiple)return"lived_multiple";if(i<lived)return"lived";if(i<marked)return"marked";return"default"}
+function featureBounds(geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){minX=Math.min(minX,c[0]);minY=Math.min(minY,c[1]);maxX=Math.max(maxX,c[0]);maxY=Math.max(maxY,c[1]);}else{c.forEach(scan)}}scan(geometry.coordinates);return [[minX,minY],[maxX,maxY]]}
+function featureCenter(geometry){const b=featureBounds(geometry);return [(b[0][0]+b[1][0])/2,(b[0][1]+b[1][1])/2]}
+function projectGeomBounds(map, geometry){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;function scan(c){if(typeof c[0]==="number"){const p=map.project([c[0],c[1]]);minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}else{c.forEach(scan)}}scan(geometry.coordinates);return {minX,minY,maxX,maxY,width:maxX-minX,height:maxY-minY}}
+function summaryCounts(feature){const p=feature.properties||{};const viv=Number(p.demo_viv??p.viv??p.vivencies??0)||0;const fita=Number(p.demo_fita??p.fita??p.fites??0)||0;const ruta=Number(p.demo_ruta??p.ruta??p.rutes??0)||0;return {viv,fita,ruta}}
+function summaryText(feature){const c=summaryCounts(feature);const parts=[];if(c.viv>0)parts.push(c.viv+" "+(c.viv===1?"vivència":"vivències"));if(c.fita>0)parts.push(c.fita+" "+(c.fita===1?"fita":"fites"));if(c.ruta>0)parts.push(c.ruta+" "+(c.ruta===1?"ruta":"rutes"));return parts.join(" · ")}
+function isMarked(feature){return (feature.properties&&feature.properties.mappiter_state)==="marked"}
+function countLabel(n,singular,plural){return n+" "+(n===1?singular:plural)}
+function listCountsText(feature){const c=summaryCounts(feature);const parts=[];if(c.viv>0)parts.push(countLabel(c.viv,"vivència","vivències"));if(c.fita>0)parts.push(countLabel(c.fita,"fita","fites"));if(c.ruta>0)parts.push(countLabel(c.ruta,"ruta","rutes"));return parts.join(" · ")}
+function escapeHtml(text){return String(text??"").replace(/[&<>"]/g,function(ch){if(ch==="&")return "&amp;";if(ch==="<")return "&lt;";if(ch===">")return "&gt;";return "&quot;"})}
+document.addEventListener("DOMContentLoaded",init);
+async function init(){
+const status=document.getElementById("status");
+const listScreen=document.getElementById("municipis-list-screen");
+const listTitle=document.getElementById("municipis-list-title");
+const listBack=document.getElementById("municipis-list-back");
+const listContainer=document.getElementById("municipis-list");
+const listEmpty=document.getElementById("municipis-empty");
+const listSearch=document.getElementById("municipis-search");
+const searchFiltersBtn=document.getElementById("municipis-search-filters");
+const searchCancelBtn=document.getElementById("municipis-search-cancel");
+const listCount=document.getElementById("municipis-count");
+const listBadge=document.getElementById("municipis-list-badge");
+const listMeta=document.getElementById("municipis-list-meta");
+const listHomeBtn=document.getElementById("list-home");
+const listHeaderActions=document.getElementById("municipis-list-header-actions");
+const listBadgeRow=document.getElementById("municipis-list-badge-row");
+const listSubnav=document.getElementById("municipis-list-subnav");
+const resultHomeBtn=document.getElementById("result-home");
+const resultToMunicipisBtn=document.getElementById("result-to-municipis");
+const resultMenuToggle=document.getElementById("result-menu-toggle");
+const resultOverflowMenu=document.getElementById("result-overflow-menu");
+const resultMenuHomeBtn=document.getElementById("result-menu-home");
+const resultMenuMunicipisBtn=document.getElementById("result-menu-municipis");
+const resultMenuMunicipisIconHost=document.getElementById("result-menu-municipis-icon-host");
+const listActions=document.getElementById("municipis-list-actions");
+const resultMapBtn=document.getElementById("municipis-list-view-map");
+const modifyFiltersBtn=document.getElementById("municipis-list-modify-filters");
+const clearFiltersBtn=document.getElementById("municipis-list-clear-filters");
+const mapContext=document.getElementById("map-context");
+const mapEmpty=document.getElementById("map-empty");
+const centerBtn=document.getElementById("center");
+const mapScreenHeader=document.getElementById("map-screen-header");
+const mapScreenBack=document.getElementById("map-screen-back");
+const mapScreenBadge=document.getElementById("map-screen-badge");
+const mapScreenToMunicipis=document.getElementById("map-screen-to-municipis");
+const mapHomeBtn=document.getElementById("map-home");
+const filterSheet=document.getElementById("filters-sheet");
+const filterCloseBtn=document.getElementById("filters-close");
+const filterApplyBtn=document.getElementById("filters-apply-list");
+const filterResetBtn=document.getElementById("filters-cancel");
+const filtersCountEl=document.getElementById("filters-count");
+const filtersActiveBadge=document.getElementById("filters-active-badge");
+const filtersHomeBtn=document.getElementById("filters-home");
+const filtersToMunicipisBtn=document.getElementById("filters-to-municipis");
+const stateButtons=Array.from(document.querySelectorAll("#filter-state-grid .filter-state-chip"));
+const contentButtons=Array.from(document.querySelectorAll("#filter-content-grid .filter-state-chip"));
+const provinceOptions=document.getElementById("province-options");
+const comarcaOptions=document.getElementById("comarca-options");
+const provinceSummary=document.getElementById("province-summary");
+const comarcaSummary=document.getElementById("comarca-summary");
+const card=document.getElementById("municipi-card"), extra=document.getElementById("card-extra"), toast=document.getElementById("toast"), confirmOverlay=document.getElementById("confirm-overlay");
+const portadaListIcon=document.querySelector("#list-icon .icon-svg");
+if(portadaListIcon && resultMenuMunicipisIconHost){resultMenuMunicipisIconHost.innerHTML = portadaListIcon.outerHTML;}
+let municipis=await fetch("municipis_icgc_simplificat.json").then(r=>r.json()).catch(()=>fetch("municipis_icgc.json").then(r=>r.json()));
+const total=municipis.features.length;
+municipis.features=municipis.features.map((f,i)=>{
+  if(!f.properties)f.properties={};
+  f.properties.demo_state=demoState(i,total);
+  if(f.properties&&f.properties.CODIMUNI!=null)f.id=f.properties.CODIMUNI;
+  if(!f.id)f.id=i+1;
+  const s=f.properties.demo_state;
+  const n=i+1;
+  if(s==="default"){f.properties.mappiter_state="unmarked";f.properties.demo_viv=0;f.properties.demo_fita=(n%11===0)?1:0;f.properties.demo_ruta=0;}
+  else if(s==="marked"){f.properties.mappiter_state="marked";f.properties.demo_viv=0;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%13===0)?1:0;}
+  else if(s==="lived"){f.properties.mappiter_state="marked";f.properties.demo_viv=1;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%9===0)?1:0;}
+  else{f.properties.mappiter_state="marked";f.properties.demo_viv=2;f.properties.demo_fita=(n%4===0)?1:0;f.properties.demo_ruta=(n%7===0)?1:0;}
+  f.properties.filter_match=1;
+  return f;
+});
+const featureMap=new Map(municipis.features.map(f=>[String(f.id),f]));
+const municipiListItems=municipis.features.map(f=>({id:String(f.id),searchText:((f.properties&&(f.properties.NOMMUNI||""))||"").toLocaleLowerCase("ca"),sortName:((f.properties&&(f.properties.NOMMUNI||""))||"")})).sort((a,b)=>a.sortName.localeCompare(b.sortName,"ca"));
+const provinces=Array.from(new Set(municipis.features.map(f=>(f.properties&&f.properties.NOMPROV)||"").filter(Boolean))).sort((a,b)=>a.localeCompare(b,"ca"));
+const comarquesByProvince=new Map();
+municipis.features.forEach(f=>{const p=(f.properties&&f.properties.NOMPROV)||"";const c=(f.properties&&f.properties.NOMCOMAR)||"";if(!p||!c)return;if(!comarquesByProvince.has(p))comarquesByProvince.set(p,new Set());comarquesByProvince.get(p).add(c);});
+const allComarques=Array.from(new Set(municipis.features.map(f=>(f.properties&&f.properties.NOMCOMAR)||"").filter(Boolean))).sort((a,b)=>a.localeCompare(b,"ca"));
+const catBounds=bounds(municipis), expandedBounds=expandBounds(catBounds,0.0015);
+const map=new maplibregl.Map({container:"map",style:{version:8,sources:{},layers:[]},attributionControl:false,renderWorldCopies:false,dragRotate:false,pitchWithRotate:false,touchPitch:false});
+map.dragRotate.disable();map.touchZoomRotate.disableRotation();
+let initialCamera=null,suppress=false,selectedFeature=null,cardOpen=false,dragStartPoint=null,focusCenter=null,focusRecentering=false,ignoreUntil=0,cardAnchorTop=0,pendingUnmarkMode=null;
+let currentScreen="mapa_general";
+let lastMapScreen="mapa_general";
+const activeFilters={states:new Set(),content:new Set(),provinces:new Set(),comarques:new Set()};
+const draftFilters={states:new Set(),content:new Set(),provinces:new Set(),comarques:new Set()};
+function cloneFilters(source){return {states:new Set(source.states),content:new Set(source.content),provinces:new Set(source.provinces),comarques:new Set(source.comarques)}}
+function copyFiltersInto(source,target){target.states=new Set(source.states);target.content=new Set(source.content);target.provinces=new Set(source.provinces);target.comarques=new Set(source.comarques);}
+function hasAnyFilters(filters=activeFilters){return filters.states.size>0||filters.content.size>0||filters.provinces.size>0||filters.comarques.size>0}
+function availableComarques(filters=draftFilters){if(filters.provinces.size===0)return allComarques.slice();const set=new Set();filters.provinces.forEach(p=>{(comarquesByProvince.get(p)||new Set()).forEach(c=>set.add(c))});return Array.from(set).sort((a,b)=>a.localeCompare(b,"ca"));}
+function cleanupSelectedComarques(filters=draftFilters){const valid=new Set(availableComarques(filters));Array.from(filters.comarques).forEach(c=>{if(!valid.has(c))filters.comarques.delete(c)});}
+function matchesFilters(feature, filters){const p=feature.properties||{};const c=summaryCounts(feature);const marked=isMarked(feature);const wantsMarked=filters.states.has("marked");const wantsUnmarked=filters.states.has("unmarked");if(wantsMarked && !marked) return false;if(wantsUnmarked && marked) return false;if(filters.content.size>0){const matchesContent=(filters.content.has("viv") && c.viv>0) || (filters.content.has("fita") && c.fita>0) || (filters.content.has("ruta") && c.ruta>0);if(!matchesContent) return false;}if(filters.provinces.size>0 && !filters.provinces.has(p.NOMPROV||"")) return false;if(filters.comarques.size>0 && !filters.comarques.has(p.NOMCOMAR||"")) return false;return true;}
+function countMatchingFilters(filters){let count=0;for(const feature of municipis.features){if(matchesFilters(feature,filters))count++;}return count;}
+function updateFeatureFilterMatch(){municipis.features.forEach(f=>{f.properties.filter_match=matchesFilters(f,activeFilters)?1:0;});}
+function visibleListFeatureIds(){const term=listSearch.value.trim().toLocaleLowerCase("ca");const ids=[];for(const item of municipiListItems){if(term && item.searchText.indexOf(term)===-1) continue;const feature=featureMap.get(item.id);if(!feature) continue;if(currentScreen==="resultat" && feature.properties.filter_match!==1) continue;ids.push(item.id);}return ids;}
+function currentResultCount(){return countMatchingFilters(activeFilters);}
+function activeDraftCriteriaCount(){return draftFilters.states.size + draftFilters.content.size + draftFilters.provinces.size + draftFilters.comarques.size;}
+function updateListModeUI(){
+  const showResult=currentScreen==="resultat";
+  const showMunicipis=currentScreen==="municipis";
+  listScreen.classList.toggle("simple-result", showResult);
+  listScreen.classList.toggle("simple-municipis", showMunicipis);
+  listTitle.textContent=showResult?"Municipis filtrats":"Municipis";
+  listBack.setAttribute("aria-label", showResult?"Tornar a filtres":"Tornar al mapa base");
+  listSearch.placeholder="Cercar municipi";
+  listActions.hidden=!showResult;
+  listCount.hidden=true;
+  searchFiltersBtn.style.display=showResult?"none":"flex";
+  listHeaderActions.style.display="flex";
+  listSubnav.hidden=true;
+  listMeta.textContent=showMunicipis?"947 municipis":"";
+  listMeta.style.display=showMunicipis?"block":"none";
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+  if(resultMenuToggle) resultMenuToggle.style.display=showResult?"flex":"none";
+  if(showResult){
+    const count=currentResultCount();
+    listBadgeRow.hidden=false;
+    listBadge.textContent=String(count);
+    listBadge.classList.add("show");
+  }else{
+    listBadgeRow.hidden=true;
+    listBadge.textContent="";
+    listBadge.classList.remove("show");
+  }
+}
+function renderListSummary(){
+  listCount.textContent="";
+  listCount.hidden=true;
+}
+function renderMunicipiList(){
+  updateListModeUI();
+  renderListSummary();
+  const ids=visibleListFeatureIds();
+  const html=[];
+  for(const id of ids){const feature=featureMap.get(id);if(!feature) continue;const p=feature.properties||{};const counts=summaryCounts(feature);const stateClass=counts.viv>1?" is-lived-multi":(counts.viv===1?" is-lived":(isMarked(feature)?" is-marked":""));html.push('<button class="municipi-list-row'+stateClass+'" data-id="'+id+'"><div class="municipi-list-main"><div class="municipi-list-marker">'+(isMarked(feature)?'<span class="municipi-list-marker-dot" aria-hidden="true"></span>':'')+'</div><div><div class="municipi-list-name">'+escapeHtml(p.NOMMUNI||"Municipi")+'</div><div class="municipi-list-meta">'+escapeHtml((p.NOMCOMAR||"Comarca")+' · '+(p.NOMPROV||"Província"))+'</div></div></div><div class="municipi-list-side"><div class="municipi-list-counts">'+escapeHtml(listCountsText(feature))+'</div></div></button>');}
+  listContainer.innerHTML=html.join("");
+  listEmpty.classList.toggle("show", html.length===0);
+  listEmpty.textContent=currentScreen==="resultat"?"No s'han trobat municipis amb aquests filtres":"No s'han trobat municipis";
+}
+function renderProvinceOptions(){provinceOptions.innerHTML=provinces.map(p=>'<label class="filter-check"><input type="checkbox" data-province="'+escapeHtml(p)+'" '+(draftFilters.provinces.has(p)?'checked':'')+'><span>'+escapeHtml(p)+'</span></label>').join("")}
+function renderComarcaOptions(){const available=availableComarques(draftFilters);comarcaOptions.innerHTML=available.map(c=>'<label class="filter-check"><input type="checkbox" data-comarca="'+escapeHtml(c)+'" '+(draftFilters.comarques.has(c)?'checked':'')+'><span>'+escapeHtml(c)+'</span></label>').join("") || '<div class="filter-placeholder">No hi ha comarques disponibles amb els filtres actuals.</div>'}
+function summaryForSet(set, allText, pluralLabel){if(set.size===0)return allText;if(set.size===1)return Array.from(set)[0];return set.size+" "+pluralLabel;}
+function updateFilterUI(){
+  stateButtons.forEach(btn=>btn.classList.toggle("active",draftFilters.states.has(btn.getAttribute("data-state"))));
+  contentButtons.forEach(btn=>btn.classList.toggle("active",draftFilters.content.has(btn.getAttribute("data-content"))));
+  provinceSummary.textContent=summaryForSet(draftFilters.provinces,"Totes les províncies","províncies");
+  comarcaSummary.textContent=summaryForSet(draftFilters.comarques,"Totes les comarques","comarques");
+  const count=countMatchingFilters(draftFilters);
+  filtersCountEl.textContent=count+" "+(count===1?"municipi":"municipis");
+  const activeCount=activeDraftCriteriaCount();
+  filtersActiveBadge.textContent=String(activeCount);
+  filtersActiveBadge.classList.toggle("show", activeCount>0);
+}
+function applyFiltersToData(){updateFeatureFilterMatch();refreshMap();updateMapEmptyState();}
+function syncDraftFromActive(){copyFiltersInto(activeFilters,draftFilters);cleanupSelectedComarques(draftFilters);renderProvinceOptions();renderComarcaOptions();updateFilterUI();}
+function clearDraftFilters(){draftFilters.states.clear();draftFilters.content.clear();draftFilters.provinces.clear();draftFilters.comarques.clear();renderProvinceOptions();renderComarcaOptions();updateFilterUI();}
+function clearAllFilters(){activeFilters.states.clear();activeFilters.content.clear();activeFilters.provinces.clear();activeFilters.comarques.clear();applyFiltersToData();}
+function goToBaseMap(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+
+  closeCard();
+  clearDraftFilters();
+  clearAllFilters();
+  closeFiltersScreen();
+  closeListScreen();
+  document.body.classList.remove("filters-map-screen");
+  document.getElementById("topbar").classList.remove("filters-map-hidden");
+  mapScreenHeader.classList.remove("show");
+  currentScreen="mapa_general";
+  lastMapScreen="mapa_general";
+  listSearch.value="";
+  clearMapContext();
+  updateMapEmptyState();
+  if(initialCamera){
+    map.resize();
+    map.jumpTo(initialCamera);
+  }
+}
+function returnToMunicipis(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+
+  closeCard();
+  clearDraftFilters();
+  clearAllFilters();
+  closeFiltersScreen();
+  document.body.classList.remove("filters-map-screen");
+  document.getElementById("topbar").classList.remove("filters-map-hidden");
+  mapScreenHeader.classList.remove("show");
+  openMunicipisScreen();
+}
+function openMunicipisScreen(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+closeCard();document.body.classList.remove("filters-map-screen");document.getElementById("topbar").classList.remove("filters-map-hidden");mapScreenHeader.classList.remove("show");currentScreen="municipis";lastMapScreen="mapa_general";listSearch.value="";listScreen.classList.add("open");listScreen.setAttribute("aria-hidden","false");renderMunicipiList();clearMapContext();updateMapFloatingControls();}
+function openResultScreen(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+closeCard();document.body.classList.remove("filters-map-screen");document.getElementById("topbar").classList.remove("filters-map-hidden");mapScreenHeader.classList.remove("show");currentScreen="resultat";lastMapScreen="resultat";listSearch.value="";listScreen.classList.add("open");listScreen.setAttribute("aria-hidden","false");renderMunicipiList();clearMapContext();updateMapFloatingControls();}
+function closeListScreen(){listScreen.classList.remove("open");listScreen.setAttribute("aria-hidden","true");}
+function openFiltersScreen(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+currentScreen="filtres";syncDraftFromActive();filterSheet.classList.add("open");filterSheet.setAttribute("aria-hidden","false");}
+function closeFiltersScreen(){filterSheet.classList.remove("open");filterSheet.setAttribute("aria-hidden","true");}
+function showMapContext(text){mapContext.textContent=text;mapContext.classList.add("show");updateMapFloatingControls();}
+function clearMapContext(){mapContext.textContent="";mapContext.classList.remove("show");updateMapFloatingControls();}
+function updateMapFloatingControls(){
+  const onFilteredMap = currentScreen==="resultat_mapa";
+  centerBtn.style.bottom = onFilteredMap ? "20px" : "16px";
+  centerBtn.style.right = "16px";
+}
+function updateMapEmptyState(){const count=currentResultCount();mapEmpty.classList.toggle("show",currentScreen==="resultat_mapa" && count===0);}
+function featureIdsBounds(ids){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;let found=false;(ids||[]).forEach(function(id){const feature=featureMap.get(String(id));if(!feature||!feature.geometry)return;const b=featureBounds(feature.geometry);minX=Math.min(minX,b[0][0]);minY=Math.min(minY,b[0][1]);maxX=Math.max(maxX,b[1][0]);maxY=Math.max(maxY,b[1][1]);found=true;});return found?[[minX,minY],[maxX,maxY]]:null;}
+function filteredFeatureIds(){return municipis.features.filter(f=>f.properties&&f.properties.filter_match===1).map(f=>String(f.id));}
+function fitMapToFeatureIds(ids){const b=featureIdsBounds(ids);if(!b)return;const minLng=b[0][0], minLat=b[0][1], maxLng=b[1][0], maxLat=b[1][1];const padLng=Math.max((maxLng-minLng)*0.08,0.02);const padLat=Math.max((maxLat-minLat)*0.08,0.02);const topPad=currentScreen==="resultat_mapa"?96:120;map.resize();map.fitBounds([[minLng-padLng,minLat-padLat],[maxLng+padLng,maxLat+padLat]],{padding:{top:topPad,right:28,bottom:40,left:28},duration:220,maxZoom:9.4,essential:true});}
+function fitMapToFilteredResults(){fitMapToFeatureIds(filteredFeatureIds());}
+function openResultMapScreen(){
+  if(resultOverflowMenu){resultOverflowMenu.classList.remove("open");resultOverflowMenu.setAttribute("aria-hidden","true");}
+closeListScreen();closeCard();currentScreen="resultat_mapa";lastMapScreen="resultat_mapa";document.body.classList.add("filters-map-screen");document.getElementById("topbar").classList.add("filters-map-hidden");mapScreenBadge.textContent=String(currentResultCount());mapScreenBadge.classList.add("show");mapScreenHeader.classList.add("show");updateMapFloatingControls();requestAnimationFrame(function(){map.resize();fitMapToFilteredResults();clearMapContext();updateMapEmptyState();});}
+function openResultMapBackToResult(){document.body.classList.remove("filters-map-screen");document.getElementById("topbar").classList.remove("filters-map-hidden");mapScreenHeader.classList.remove("show");openResultScreen();}
+function featureKey(featureOrId){if(featureOrId==null) return null;if(typeof featureOrId !== "object") return featureOrId;if(featureOrId.id!=null) return featureOrId.id;if(featureOrId.properties&&featureOrId.properties.CODIMUNI!=null) return featureOrId.properties.CODIMUNI;return null;}
+function canonicalFeature(featureOrId){const key=featureKey(featureOrId);if(key==null) return null;return featureMap.get(String(key)) || null;}
+function commitSelectedFeature(featureOrId, mutator){const real=canonicalFeature(featureOrId);if(!real||!real.properties) return null;mutator(real);selectedFeature=real;applyFiltersToData();updateCardContent(real);const sel=map.getSource("selected-municipi");if(sel) sel.setData({type:"FeatureCollection",features:[real]});if(currentScreen==="resultat")renderMunicipiList();return real;}
+function refreshMap(){const src=map.getSource("municipis");if(src)src.setData(municipis);const sel=map.getSource("selected-municipi");if(sel&&selectedFeature)sel.setData({type:"FeatureCollection",features:[selectedFeature]});updateMapEmptyState();}
+function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(showToast._t);showToast._t=setTimeout(()=>toast.classList.remove("show"),1500)}
+function visibleSheetTop(){return window.innerHeight;}
+function applyCardHeightConstraint(){const margin=16;const safeBottom=visibleSheetTop()-12;const maxAllowed=Math.max(220,safeBottom-margin);card.style.maxHeight=Math.floor(Math.min(560,window.innerHeight*0.72,maxAllowed))+"px"}
+function computeCardTop(){if(!selectedFeature)return 0;applyCardHeightConstraint();const box=projectGeomBounds(map, selectedFeature.geometry);const rect=card.getBoundingClientRect();const margin=16;const safeBottom=visibleSheetTop()-12;const preferredBelow=box.maxY+104;const preferredAbove=box.minY-rect.height-104;if(preferredBelow+rect.height<=safeBottom)return preferredBelow;let top=Math.min(preferredAbove,safeBottom-rect.height);if(top<margin)top=Math.max(margin,safeBottom-rect.height);return top}
+function placeCard(lockTop){if(!selectedFeature)return;applyCardHeightConstraint();const center=map.project(featureCenter(selectedFeature.geometry));const rect=card.getBoundingClientRect();const margin=16;let left=center.x, half=rect.width/2;if(left-half<margin)left=margin+half;if(left+half>window.innerWidth-margin)left=window.innerWidth-margin-half;card.style.left=left+"px";if(lockTop){const safeBottom=visibleSheetTop()-12;const top=Math.max(margin,Math.min(cardAnchorTop,safeBottom-rect.height));cardAnchorTop=top;card.style.top=top+"px"}else{cardAnchorTop=computeCardTop();card.style.top=cardAnchorTop+"px"}}
+function targetZoomForFeature(){const minZoom=8.15,maxZoom=8.45,current=map.getZoom();if(current<minZoom)return 8.25;if(current>maxZoom)return current;return current}
+function closeCard(){card.classList.remove("open");extra.classList.remove("open");cardOpen=false;selectedFeature=null;focusCenter=null;const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[]});ignoreUntil=Date.now()+250}
+function updateCardActions(){if(!selectedFeature)return;const primary=document.getElementById("btn-primary");const moreBtn=document.getElementById("btn-more");primary.hidden=false;moreBtn.hidden=false;const marked=isMarked(selectedFeature);primary.textContent=marked?"Afegir vivència":"Marcar municipi";const actions=marked?[{id:"extra-fita",label:"Afegir fita",full:true},{id:"extra-view",label:"Veure municipi"},{id:"extra-unmark",label:"Desmarcar municipi"}]:[{id:"extra-viv",label:"Afegir vivència",full:true},{id:"extra-fita",label:"Afegir fita"},{id:"extra-view",label:"Veure municipi"}];extra.innerHTML=actions.map(a=>'<button id="'+a.id+'"'+(a.full?' class="full"':'')+'>'+a.label+'</button>').join("");bindExtraButtons();}
+function updateCardContent(feature){const p=feature.properties||{};const summaryEl=document.getElementById("card-summary");const summary=summaryText(feature);document.getElementById("card-title").textContent=p.NOMMUNI||"Municipi";document.getElementById("card-meta").textContent=(p.NOMCOMAR||"Comarca")+" · "+(p.NOMPROV||"Província");summaryEl.textContent=summary;summaryEl.hidden=!summary;updateCardActions();if(cardOpen)setTimeout(function(){placeCard(false)},0)}
+function selectFeature(feature){const real=canonicalFeature(feature);if(!real)return;selectedFeature=real;focusCenter=featureCenter(real.geometry);updateCardContent(real);extra.classList.remove("open");const src=map.getSource("selected-municipi");if(src)src.setData({type:"FeatureCollection",features:[real]});map.easeTo({center:focusCenter,zoom:targetZoomForFeature(),offset:[0,-145],duration:220,essential:true});setTimeout(function(){card.classList.add("open");cardOpen=true;placeCard(false)},230)}
+function markMunicipi(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="marked";target.properties.demo_state="marked";});if(!real)return;showToast("Municipi marcat")}
+function addVivencia(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="marked";target.properties.demo_state="lived";target.properties.demo_viv=Number(target.properties.demo_viv||0)+1;});if(!real)return;showToast("Vivència afegida")}
+function addFita(f){const real=commitSelectedFeature(f,function(target){target.properties.demo_fita=Number(target.properties.demo_fita||0)+1;if(target.properties.mappiter_state==="marked" && Number(target.properties.demo_viv||0)===0){target.properties.demo_state="marked";}});if(!real)return;showToast("Fita afegida")}
+function directUnmark(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="unmarked";target.properties.demo_state="default";target.properties.demo_viv=0;target.properties.demo_fita=0;target.properties.demo_ruta=0;});if(!real)return;showToast("Municipi desmarcat")}
+function unmarkKeepFites(f){const real=commitSelectedFeature(f,function(target){target.properties.mappiter_state="unmarked";target.properties.demo_state="default";target.properties.demo_viv=0;target.properties.demo_ruta=0;});if(!real)return;showToast("Municipi desmarcat mantenint fites")}
+function openDecisionDialog(feature){const c=summaryCounts(feature);document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent="Aquest municipi té contingut. Què vols fer?";document.getElementById("confirm-step-1").style.display="";document.getElementById("confirm-step-2").style.display="none";document.getElementById("confirm-keep-fites").style.display = c.fita>0 ? "" : "none";confirmOverlay.classList.add("open")}
+function openFinalConfirm(mode){pendingUnmarkMode=mode;document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent = mode==="keep_fites" ? "Aquesta acció eliminarà definitivament tot el contingut que has registrat en aquest municipi, exceptuant les fites" : "Aquesta acció eliminarà definitivament tot el contingut que has registrat en aquest municipi";document.getElementById("confirm-step-1").style.display="none";document.getElementById("confirm-step-2").style.display="";confirmOverlay.classList.add("open")}
+function handleUnmark(f){const c=summaryCounts(f);if(c.viv===0&&c.fita===0&&c.ruta===0){directUnmark(f);return;}openDecisionDialog(f)}
+function closeConfirm(){confirmOverlay.classList.remove("open");pendingUnmarkMode=null;document.getElementById("confirm-title").textContent="Desmarcar municipi";document.getElementById("confirm-text").textContent="Aquest municipi té contingut. Què vols fer?";document.getElementById("confirm-step-1").style.display="";document.getElementById("confirm-step-2").style.display="none"}
+function bindExtraButtons(){const g=id=>document.getElementById(id);if(g("extra-view")) g("extra-view").onclick=function(ev){ev.stopPropagation();showToast("Veure municipi")};if(g("extra-viv")) g("extra-viv").onclick=function(ev){ev.stopPropagation();addVivencia(selectedFeature)};if(g("extra-fita")) g("extra-fita").onclick=function(ev){ev.stopPropagation();addFita(selectedFeature)};if(g("extra-unmark")) g("extra-unmark").onclick=function(ev){ev.stopPropagation();handleUnmark(selectedFeature)}}
+function centerMap(){
+  if(currentScreen==="resultat_mapa"){
+    closeCard();
+    clearMapContext();
+    const headerHeight=(mapScreenHeader.getBoundingClientRect().height||96);
+    requestAnimationFrame(function(){
+      map.resize();
+      map.fitBounds(catBounds,{
+        padding:{top:headerHeight+16,right:18,bottom:72,left:18},
+        duration:420,
+        essential:true,
+        maxZoom:8.2
+      });
+    });
+    return;
+  }
+  if(!initialCamera)return;
+  suppress=true;
+  closeCard();
+  clearMapContext();
+  currentScreen="mapa_general";
+  map.jumpTo(initialCamera);
+  setTimeout(()=>suppress=false,0)
+}
+window.addEventListener("resize",function(){if(cardOpen)placeCard(false);updateMapFloatingControls();});
+map.on("load",function(){map.addSource("municipis",{type:"geojson",data:municipis,promoteId:"id"});map.addSource("selected-municipi",{type:"geojson",data:{type:"FeatureCollection",features:[]}});map.addLayer({id:"municipis-fill",type:"fill",source:"municipis",paint:{"fill-color":["case",["==",["get","filter_match"],0],"#C9CED1",["==",["get","mappiter_state"],"unmarked"],"#F3F1EC",["==",["get","demo_viv"],0],"#2EC4CE",["==",["get","demo_viv"],1],"#0B4F8A","#062E57"]}});map.addLayer({id:"municipis-dim",type:"fill",source:"municipis",paint:{"fill-color":"#AEB6BB","fill-opacity":["case",["==",["get","filter_match"],0],0.16,0]}});map.addLayer({id:"selected-fill",type:"fill",source:"selected-municipi",paint:{"fill-color":["case",["==",["get","mappiter_state"],"unmarked"],"#E3D9CB",["==",["get","demo_viv"],0],"#5DD6DA",["==",["get","demo_viv"],1],"#2E689D","#163E63"],"fill-opacity":0.88}});map.addLayer({id:"municipis-line",type:"line",source:"municipis",paint:{"line-color":"#B5BCC0","line-opacity":0.72,"line-width":["interpolate",["linear"],["zoom"],6,0.7,8,0.9,10,1.15]}});map.addLayer({id:"selected-line",type:"line",source:"selected-municipi",paint:{"line-color":"#D45C63","line-width":["interpolate",["linear"],["zoom"],6,1.8,8,2.2,10,2.6]}});map.resize();initialCamera=map.cameraForBounds(catBounds,{padding:{top:28,right:18,bottom:64,left:18}});initialCamera.bearing=0;initialCamera.pitch=0;map.jumpTo(initialCamera);map.setMinZoom(6.1);map.setMaxZoom(10.5);status.style.display="none";syncDraftFromActive();applyFiltersToData();updateMapFloatingControls();});
+map.on("click","municipis-fill",function(e){if(Date.now()<ignoreUntil||listScreen.classList.contains("open")||filterSheet.classList.contains("open"))return;const feature=e.features&&e.features[0];if(!feature)return;const real=featureMap.get(String(feature.id))||feature;clearMapContext();if(cardOpen){const currentKey=selectedFeature?String(featureKey(selectedFeature)):null;const nextKey=String(featureKey(real));if(currentKey===nextKey){closeCard();return}closeCard();ignoreUntil=0;selectFeature(real);return}selectFeature(real)});
+map.on("mouseenter","municipis-fill",function(){map.getCanvas().style.cursor="pointer"});
+map.on("mouseleave","municipis-fill",function(){map.getCanvas().style.cursor=""});
+map.on("click",function(e){if(Date.now()<ignoreUntil||listScreen.classList.contains("open")||filterSheet.classList.contains("open"))return;const feats=map.queryRenderedFeatures(e.point,{layers:["municipis-fill"]});if(cardOpen){if(!card.contains(e.originalEvent.target)){closeCard()}}else if(!feats.length){closeCard()}});
+map.on("dragstart",function(e){if(cardOpen)dragStartPoint=e.point});
+map.on("move",function(){if(cardOpen&&focusCenter&&!focusRecentering){const current=map.getCenter();const dx=current.lng-focusCenter[0],dy=current.lat-focusCenter[1],maxOffset=0.06;if(Math.abs(dx)>maxOffset||Math.abs(dy)>maxOffset){focusRecentering=true;map.easeTo({center:focusCenter,offset:[0,-145],duration:120,essential:true});setTimeout(function(){focusRecentering=false},140)}}});
+map.on("dragend",function(e){if(!cardOpen||!dragStartPoint)return;const dx=e.point.x-dragStartPoint.x,dy=e.point.y-dragStartPoint.y;const dist=Math.sqrt(dx*dx+dy*dy);dragStartPoint=null;if(dist>48){closeCard()}});
+map.on("moveend",function(){if(suppress||!initialCamera)return;const c=map.getCenter();const minLng=expandedBounds[0][0],minLat=expandedBounds[0][1],maxLng=expandedBounds[1][0],maxLat=expandedBounds[1][1];const lng=clamp(c.lng,minLng,maxLng),lat=clamp(c.lat,minLat,maxLat);if(lng!==c.lng||lat!==c.lat){suppress=true;map.easeTo({center:[lng,lat],zoom:map.getZoom(),duration:200,essential:true});setTimeout(function(){suppress=false},220)}});
+card.addEventListener("click",function(ev){ev.stopPropagation()});
+document.getElementById("btn-close").addEventListener("click",function(ev){ev.stopPropagation();closeCard()});
+document.getElementById("btn-primary").addEventListener("click",function(ev){ev.stopPropagation();if(!selectedFeature)return;if(isMarked(selectedFeature)){addVivencia(selectedFeature)}else{markMunicipi(selectedFeature)}});
+document.getElementById("btn-more").addEventListener("click",function(ev){ev.stopPropagation();extra.classList.toggle("open");setTimeout(function(){placeCard(false)},10)});
+document.getElementById("confirm-delete-all").addEventListener("click",function(){if(!selectedFeature)return;openFinalConfirm("delete_all");});
+document.getElementById("confirm-keep-fites").addEventListener("click",function(){if(!selectedFeature)return;openFinalConfirm("keep_fites");});
+document.getElementById("confirm-cancel").addEventListener("click",closeConfirm);
+document.getElementById("confirm-final-delete").addEventListener("click",function(){if(!selectedFeature || !pendingUnmarkMode)return;if(pendingUnmarkMode==="keep_fites") unmarkKeepFites(selectedFeature);else directUnmark(selectedFeature);closeConfirm();});
+document.getElementById("confirm-final-cancel").addEventListener("click",closeConfirm);
+confirmOverlay.addEventListener("click",function(ev){if(ev.target===confirmOverlay)closeConfirm()});
+document.getElementById("list-icon").addEventListener("click",function(ev){ev.stopPropagation();openMunicipisScreen();});
+listBack.addEventListener("click",function(ev){ev.stopPropagation();if(currentScreen==="resultat"){openFiltersScreen();}else{goToBaseMap();}});
+searchFiltersBtn.addEventListener("click",function(ev){ev.stopPropagation();openFiltersScreen();});
+searchCancelBtn.addEventListener("click",function(ev){ev.stopPropagation();listSearch.value="";listSearch.blur();renderMunicipiList();});
+listSearch.addEventListener("focus",function(){listScreen.classList.add("search-mode")});
+listSearch.addEventListener("blur",function(){if(!listSearch.value)listScreen.classList.remove("search-mode")});
+listSearch.addEventListener("input",function(){renderMunicipiList();});
+listContainer.addEventListener("click",function(ev){const row=ev.target.closest(".municipi-list-row");if(!row)return;const id=row.getAttribute("data-id");const feature=featureMap.get(String(id));if(!feature)return;closeListScreen();selectFeature(feature);});
+resultMapBtn.addEventListener("click",function(){openResultMapScreen();});
+modifyFiltersBtn.addEventListener("click",function(){openFiltersScreen();});
+clearFiltersBtn.addEventListener("click",function(){closeCard();clearAllFilters();clearMapContext();openMunicipisScreen();});
+mapScreenBack.addEventListener("click",function(){openResultMapBackToResult();});
+centerBtn.addEventListener("click",function(){centerMap();});
+filterCloseBtn.addEventListener("click",function(){returnToMunicipis();});
+filtersToMunicipisBtn.addEventListener("click",function(){returnToMunicipis();});
+filterApplyBtn.addEventListener("click",function(){copyFiltersInto(draftFilters,activeFilters);applyFiltersToData();closeFiltersScreen();openResultScreen();});
+filterResetBtn.addEventListener("click",function(){clearDraftFilters();});
+listHomeBtn.addEventListener("click",function(ev){ev.stopPropagation();goToBaseMap();});
+resultHomeBtn.addEventListener("click",function(){goToBaseMap();});
+resultToMunicipisBtn.addEventListener("click",function(){returnToMunicipis();});
+filtersHomeBtn.addEventListener("click",function(){goToBaseMap();});
+mapHomeBtn.addEventListener("click",function(){goToBaseMap();});
+mapScreenToMunicipis.addEventListener("click",function(){returnToMunicipis();});
+stateButtons.forEach(btn=>btn.addEventListener("click",function(){const key=btn.getAttribute("data-state");if(draftFilters.states.has(key)) draftFilters.states.delete(key); else {draftFilters.states.clear();draftFilters.states.add(key);} updateFilterUI();}));
+contentButtons.forEach(btn=>btn.addEventListener("click",function(){const key=btn.getAttribute("data-content");if(draftFilters.content.has(key))draftFilters.content.delete(key);else draftFilters.content.add(key);updateFilterUI();}));
+provinceOptions.addEventListener("change",function(ev){const input=ev.target.closest('input[data-province]');if(!input)return;const value=input.getAttribute('data-province')||"";if(input.checked)draftFilters.provinces.add(value);else draftFilters.provinces.delete(value);cleanupSelectedComarques(draftFilters);renderProvinceOptions();renderComarcaOptions();updateFilterUI();});
+comarcaOptions.addEventListener("change",function(ev){const input=ev.target.closest('input[data-comarca]');if(!input)return;const value=input.getAttribute('data-comarca')||"";if(input.checked)draftFilters.comarques.add(value);else draftFilters.comarques.delete(value);renderComarcaOptions();updateFilterUI();});
+
+function toggleResultOverflowMenu(forceOpen){if(!resultOverflowMenu)return;const next=typeof forceOpen==="boolean"?forceOpen:!resultOverflowMenu.classList.contains("open");resultOverflowMenu.classList.toggle("open",next);resultOverflowMenu.setAttribute("aria-hidden",next?"false":"true");}
+if(resultMenuToggle){resultMenuToggle.addEventListener("click",function(ev){ev.stopPropagation();toggleResultOverflowMenu();});}
+if(resultMenuHomeBtn){resultMenuHomeBtn.addEventListener("click",function(ev){ev.stopPropagation();toggleResultOverflowMenu(false);goToBaseMap();});}
+if(resultMenuMunicipisBtn){resultMenuMunicipisBtn.addEventListener("click",function(ev){ev.stopPropagation();toggleResultOverflowMenu(false);returnToMunicipis();});}
+document.addEventListener("click",function(ev){if(!resultOverflowMenu||!resultMenuToggle)return;if(resultOverflowMenu.classList.contains("open")&&!resultOverflowMenu.contains(ev.target)&&!resultMenuToggle.contains(ev.target)){toggleResultOverflowMenu(false);}});
+}
+</script>
+</body>
+</html>
